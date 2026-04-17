@@ -67,7 +67,7 @@ def ejecutar_sorteo_ajax(request):
 
     # 4. El Sorteo Matemático
     seleccionado = random.choices(candidatos, weights=pesos, k=1)[0]
-
+    premio = seleccionado.premio
     # 5. Descontar Stock (Tanto para premios reales como para "No premios")
     seleccionado.cantidad -= 1
     seleccionado.save()
