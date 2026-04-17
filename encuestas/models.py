@@ -395,6 +395,7 @@ class EncuestaFija(models.Model):
  #       super().save(*args, **kwargs)
 
     def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
         # Lógica de prioridad se ejecuta primero
         if self.tiendas.exists():
             self.region = None
