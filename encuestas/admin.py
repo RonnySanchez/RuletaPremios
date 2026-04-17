@@ -2,7 +2,8 @@ from django.contrib import admin
 from django.utils.html import format_html, mark_safe
 from django.urls import reverse
 from .models import Encuesta, TicketConsulta, Pregunta, Opcion, PreguntaOpcion, EncuestaPregunta, Respuesta, TicketVentasEnLinea, Tienda, Pais, Region, Premio, Tienda, TiendaPremio, FormularioEncFija, EncuestaFija, EncuestaFijaRespuesta, EncuestaFijaPremio
-from import_export import resources
+from import_export import resources, fields
+from import_export.widgets import ForeignKeyWidget
 from import_export.admin import ImportExportModelAdmin
 
 
@@ -74,10 +75,51 @@ class RegionAdmin(admin.ModelAdmin):
 
 
 class TiendaResources(resources.ModelResource):
-    #fields = ('nombre', 'id_efsystem', 'pais__nombre', 'region__nombre', 'activa',)
+    # 1. MANEJO SEGURO DE LLAVES FORÁNEAS
+    # Le decimos a Django que busque el objeto País usando el texto de la columna 'pais__nombre'
+    pais = fields.Field(
+        column_name='pais__nombre',
+        attribute='pais',
+        widget=ForeignKeyWidget(Pais, field='nombre')
+    )
+    region = fields.Field(
+        column_name='region__nombre',
+        attribute='region',
+        widget=ForeignKeyWidget(Region, field='nombre')
+    )
+
     class Meta:
-        fields = ('nombre', 'id_efsystem', 'pais__nombre', 'region__nombre', 'activa',)
         model = Tienda
+        
+        # 2. LÓGICA DE ACTUALIZAR O CREAR (Update or Create)
+        # Esto le dice a Django: "Si el id_efsystem ya existe, actualiza esa tienda. Si no, créala".
+        import_id_fields = ('nombre',) 
+        
+        # Agregamos los campos nuevos que mencionaste en el admin para que también se puedan importar
+        fields = ('id_efsystem', 'nombre', 'pais', 'region', 'activa', 'monto_minimo_promociones', 'requiere_validacion_ticket')
+        
+        # Configuraciones de optimización
+        skip_unchanged = True  # Ignora las filas que no tienen cambios para ahorrar memoria
+        report_skipped = False
+
+    # 3. EL ESCUDO ANTI-ERRORES 500 (Interceptar y Limpiar)
+    # Esta función se ejecuta por cada fila del Excel ANTES de que Django intente guardarla.
+    def before_import_row(self, row, **kwargs):
+        # A. Limpiar el campo booleano 'activa' (A veces el Excel trae 'Verdadero', '1', o 'TRUE')
+        if 'activa' in row and row['activa'] is not None:
+            val = str(row['activa']).strip().lower()
+            row['activa'] = val in ['1', 'true', 'sí', 'si', 'yes', 'v']
+
+        # B. Limpiar y Auto-Crear Países faltantes para que no crashee
+        pais_nombre = row.get('pais__nombre')
+        if pais_nombre:
+            # Si el país que viene en el Excel no existe en tu BD, lo crea en silencio
+            Pais.objects.get_or_create(nombre=pais_nombre.strip())
+
+        # C. Limpiar y Auto-Crear Regiones faltantes
+        region_nombre = row.get('region__nombre')
+        if region_nombre:
+            Region.objects.get_or_create(nombre=region_nombre.strip())
 
 
 @admin.register(Tienda)
