@@ -90,7 +90,7 @@ def ejecutar_sorteo_ajax(request):
         'premio_id': premio.id,
         'nombre_premio': premio.nombre,
         'descripcion_premio': premio.descripcion or "", # Enviamos la descripción
-        'imagen_url': premio.imagen.url if premio.imagen else None, # Enviamos la URL de la imagen
+        'imagen_url': premio.imagen.url if premio.imagen.name else None, # Enviamos la URL de la imagen
         'es_premio_real': premio.es_premio
     })
 
