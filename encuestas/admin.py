@@ -7,13 +7,6 @@ from import_export.widgets import ForeignKeyWidget
 from import_export.admin import ImportExportModelAdmin
 
 
-class TiendaPremioResource(resources.ModelResource):
- #   fields = ('tienda__nombre',)
-#    exclude = ('id', )
-    class Meta:
-        model = TiendaPremio 
-        fields = ('tienda__nombre', 'premio__nombre', 'cantidad', 'monto_minimo_premio', 'fecha_activacion', 'id', 'visible',)
-
 
 
 class PremioResources(resources.ModelResource):
@@ -46,12 +39,74 @@ class TiendaPremioInline(admin.TabularInline):
     # Puedes definir 'readonly_fields' si algunos campos no deben ser editables
     sortable_field_name = "orden"
 
+
+class TiendaPremioResource(resources.ModelResource):
+    # Traducimos el nombre de la tienda del Excel al objeto Tienda real
+    tienda = fields.Field(
+        column_name='tienda__nombre', 
+        attribute='tienda',
+        widget=ForeignKeyWidget(Tienda, field='nombre')
+    )
+
+    # Traducimos el nombre del premio del Excel al objeto Premio real
+    premio = fields.Field(
+        column_name='premio__nombre',
+        attribute='premio',
+        widget=ForeignKeyWidget(Premio, field='nombre')
+    )
+
+    class Meta:
+        model = TiendaPremio
+        # Usamos el 'id' como llave maestra, aunque no venga en el Excel
+        import_id_fields = ('id',) 
+        # Incluimos todos tus campos personalizados
+        fields = ('id', 'tienda', 'premio', 'cantidad', 'monto_minimo_premio', 'fecha_activacion', 'visible', 'orden')
+        skip_unchanged = True
+
+    # La función que intercepta los datos para inyectar el ID y actualizar el stock
+    def before_import_row(self, row, **kwargs):
+        # 1. Limpiar el campo booleano 'visible' por si acaso
+        if 'visible' in row and row['visible'] is not None:
+            val = str(row['visible']).strip().lower()
+            row['visible'] = val in ['1', 'true', 'sí', 'si', 'yes', 'v']
+
+        tienda_nombre = row.get('tienda__nombre')
+        premio_nombre = row.get('premio__nombre')
+
+        if tienda_nombre and premio_nombre:
+            tienda_nombre = str(tienda_nombre).strip()
+            premio_nombre = str(premio_nombre).strip()
+
+            try:
+                # Buscamos la tienda por nombre
+                tienda_obj = Tienda.objects.get(nombre=tienda_nombre)
+                
+                # Buscamos el premio (si no existe, lo crea vacío para no crashear)
+                premio_obj, created = Premio.objects.get_or_create(nombre=premio_nombre)
+
+                # Buscamos si ESTA tienda ya tiene asignado ESTE premio
+                inventario = TiendaPremio.objects.filter(tienda=tienda_obj, premio=premio_obj).first()
+
+                if inventario:
+                    # ¡MAGIA! Inyectamos el ID interno. 
+                    # Esto le dice a Django: "Actualiza esta fila, no crees una nueva".
+                    row['id'] = inventario.id
+
+            except Tienda.DoesNotExist:
+                # Si la tienda no existe, el importador lo marcará como error en el panel
+                # de forma amigable, sin tumbar el servidor (Error 500).
+                pass
+
+# ---------------------------------------------------------
+# 2. EL REGISTRO EN EL ADMIN (Mantenemos el tuyo, solo añadí list_editable)
+# ---------------------------------------------------------
 @admin.register(TiendaPremio)
 class TiendaPremioAdmin(ImportExportModelAdmin):
     resource_class = TiendaPremioResource
-    list_display = ('tienda', 'premio', 'cantidad', 'fecha_activacion', 'visible')
+    list_display = ('tienda', 'premio', 'cantidad', 'monto_minimo_premio', 'fecha_activacion', 'visible')
     search_fields = ('tienda__nombre', 'premio__nombre')
     list_filter = ('tienda', 'premio', 'visible')
+    list_editable = ('cantidad', 'visible') # Esto es muy útil para que cambies stock rápido sin entrar al detalle
 
 
 
