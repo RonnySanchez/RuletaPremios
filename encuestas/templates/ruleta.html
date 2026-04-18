@@ -368,12 +368,51 @@
             speed = 0;
             pause = true;
             isSpinning = false;
-            mostrarResultadoModal(resultadoFinal);
+            
+            // --- CAMBIO AQUÍ ---
+            // Ya no mostramos el Modal. 
+            // Esperamos 1 segundo (1000ms) y enviamos los datos a la pantalla final.
+            setTimeout(enviarDatosPremioAutomatico, 1000);
         }
         currentDeg += speed;
         draw();
         window.requestAnimationFrame(animate);
     }
+
+    function enviarDatosPremioAutomatico() {
+        // 1. Creamos un formulario invisible
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = "{% url 'guardar_premio' %}"; // Asegúrate de que este sea el nombre correcto de tu url
+
+        // 2. Token de seguridad obligatorio de Django
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrfmiddlewaretoken';
+        csrfInput.value = '{{ csrf_token }}';
+        form.appendChild(csrfInput);
+
+        // 3. Enviamos el ID del premio que nos dictó el servidor por AJAX
+        const premioInput = document.createElement('input');
+        premioInput.type = 'hidden';
+        premioInput.name = 'premio_id';
+        premioInput.value = resultadoFinal.id; // Recuerda que capturamos el ID en la función spin()
+        form.appendChild(premioInput);
+
+        // 4. Enviamos el ticket asociado
+        const ticketInput = document.createElement('input');
+        ticketInput.type = 'hidden';
+        ticketInput.name = 'codigo_ticket';
+        ticketInput.value = '{{ codigo_ticket }}';
+        form.appendChild(ticketInput);
+
+        // 5. Adjuntamos a la página y disparamos la redirección
+        document.body.appendChild(form);
+        form.submit();
+    }
+
+
+
     
     // --- NUEVA LÓGICA DE SORTEO SEGURO CON AJAX ---
     async function spin() {

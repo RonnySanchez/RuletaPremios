@@ -495,70 +495,41 @@ def encuestafijaticket(request, tienda_id, encuesta_id, codigo_ticket):
 
 
 def guardar_premio(request):
-    premio = request.POST.get('premio')
+    # Solo permitimos POST para mayor seguridad
+    if request.method != 'POST':
+        return redirect('index')
+
+    # Capturamos los datos que envía nuestro nuevo Javascript
     codigo_ticket = request.POST.get('codigo_ticket')
-    encuesta_id = request.POST.get('encuesta_fija')
-    tienda_id = int(request.POST.get('tienda'))
-    encuesta_fija = get_object_or_404(EncuestaFija, id=encuesta_id)
-    respuestas = get_object_or_404(EncuestaFijaRespuesta, codigo_ticket=codigo_ticket)
+    # premio_id = request.POST.get('premio_id') # Opcional, con el ticket basta
 
-    tienda = get_object_or_404(Tienda, id=tienda_id, activa=True)
-    # Validar que la tienda esté asignada a la encuesta
-    t_asignadas = encuesta_fija.get_tiendas_asignadas()
-    if not t_asignadas.filter(id=tienda.id).exists():
+    # 1. BUSCAMOS EL PREMIO QUE YA FUE CREADO
+    # Buscamos el registro que la función AJAX generó hace un segundo
+    try:
+        entregado = EncuestaFijaPremio.objects.get(codigo_ticket=codigo_ticket)
+    except EncuestaFijaPremio.DoesNotExist:
+        # Si alguien intenta entrar a esta URL sin haber girado la ruleta
         return render(request, 'RespEmitida.html', {
-                'error': "! No hay sorteos en esta tienda !.",
-                'texto': "Gracias por tu participación"
-            })
+            'error': "No se encontró un registro de premio para este ticket.",
+            'texto': "Por favor, asegúrate de completar el sorteo correctamente."
+        })
 
+    # 2. LOG DE VERIFICACIÓN (Opcional, para tus pruebas en consola)
+    print(f"--- Mostrando Pantalla Final ---")
+    print(f"Ticket: {entregado.codigo_ticket}")
+    print(f"Premio: {entregado.premio.nombre}")
+    print(f"Cliente: {entregado.nombre} {entregado.apellidos}")
 
-    # Validar si ya existe una respuesta con el mismo código de ticket (si el código fue proporcionado)
-    if codigo_ticket:
-        try:
-            # Si existe una respuesta con ese código y encuesta, redirigir o mostrar error
-            respuesta_existente = EncuestaFijaPremio.objects.get(
-                codigo_ticket=codigo_ticket, encuesta_fija=encuesta_fija.id
-            )
-            # Mostrar un mensaje o redirigir si ya existe la respuesta
-            return render(request, 'RespEmitida.html', {
-                'error': "Premio entregado.",
-                'texto': "Gracias por tu participación"
-            })
-        except EncuestaFijaPremio.DoesNotExist:
-            # No existe una respuesta con este código, continuar con la lógica normal
-            pass
-
-
-    # Lógica para almacenar el premio ganado
-    obPremio = Premio.objects.get(nombre=premio)
-    premio_obj = TiendaPremio.objects.get(tienda_id =tienda_id, premio_id=obPremio.id)  
-    # Puedes obtener datos del usuario si es necesario
-    # y luego crear una instancia de EncuestaFijaPremio
-    print('Antes de entregar:')
-    print("Hay {} {}".format(premio_obj.cantidad, obPremio))
-#    print("Hay " + str(premio_obj.cantidad) + " " + obPremio)
-    entregado = EncuestaFijaPremio.objects.create(
-        encuesta_fija=encuesta_fija,  # Asegúrate de pasar la encuesta correcta
-        respuesta=respuestas,  # Relacionar con la respuesta de la encuesta fija
-        nombre=respuestas.nombre,
-        apellidos=respuestas.apellidos,
-        codigo_ticket=codigo_ticket,
-        DNI=respuestas.DNI,
-        premio=obPremio,
-        tienda = Tienda.objects.get(id=tienda_id),
-    )
-    print('Luego de entregar:')
-    premio_obj.cantidad = premio_obj.cantidad - 1
-    premio_obj.save()
-    print("Premio: {}".format(obPremio))
-    print("Cliente: {}".format(respuestas.nombre))
-    print("Tienda: {}".format(Tienda.objects.get(id=tienda_id)))
+    # 3. ENVIAMOS EL CONTEXTO A LA PLANTILLA
+    # 'entregado' es la instancia de EncuestaFijaPremio
     context = {
         'premio': entregado,
     }
-    return render(request, 'premio_entregado1.html', context)
-
-
+    
+    if entregado.premio.es_premio_real: 
+        return render(request, 'premio_entregado1.html', context)
+    else:
+        return render(request, 'sin_premio.html', context)
 
 
 

@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+¡Sigue intentando!
+{% endblock title %}
+
+{% block header %}  
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100..900&display=swap" rel="stylesheet">
+
+<style>
+    body {
+        background-color: #003468 !important;
+        background-repeat: repeat;
+        font-family: "Montserrat", sans-serif !important;
+        color: #eeeeee !important;
+    }
+    .card-borde-personalizado {
+        border: 0px solid rgba(0, 0, 0, .125) !important;
+        background-color: rgba(0, 0, 0, 0) !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-1">
+        <div class="col-1 col-md-4"></div>
+        <div class="col-10 col-md-4 mt-5">
+            <div class="card card-borde-personalizado text-center">
+                <div class="card-body">
+                    <img src="{% static 'images/suerte_proxima.png' %}" class="img-fluid mx-auto d-block mb-4" style="max-width: 150px;" alt="Suerte">
+                    
+                    <h1 class="mb-3">¡Casi lo logras!</h1>
+                    <h4 class="mb-4">No hubo suerte esta vez, {{ premio.nombre }}</h4>
+                    
+                    <p>Gracias por participar con tu ticket: <strong>{{ premio.codigo_ticket }}</strong></p>
+                    <p class="text-muted mt-3"><small>Te esperamos en tu próxima compra para seguir jugando.</small></p>
+                </div>
+            </div>
+        </div>
+        <div class="col-1 col-md-4"></div>
+    </div>
+</div>
+{% endblock content %}
