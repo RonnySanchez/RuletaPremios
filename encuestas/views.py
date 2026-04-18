@@ -526,7 +526,7 @@ def guardar_premio(request):
         'premio': entregado,
     }
     
-    if entregado.premio.es_premio_real: 
+    if entregado.premio.es_premio: 
         return render(request, 'premio_entregado1.html', context)
     else:
         return render(request, 'sin_premio.html', context)
