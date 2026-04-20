@@ -597,3 +597,42 @@ def vista_juego_regalos(request, encuesta_id, tienda_id, codigo_ticket):
     # 4. Renderizar la plantilla HTML y pasarle el contexto
     # Asegúrate de que tu archivo esté en 'templates/encuestas/tabla_regalos.html'
     return render(request, 'tabla_regalos.html', context)
+
+
+
+def simulador_pantallas(request):
+    # Solo administradores o personal autorizado debería ver esto (opcional pero recomendado)
+    if not request.user.is_staff:
+        return redirect('index')
+
+    if request.method == 'POST':
+        premio_id = request.POST.get('premio_id')
+        
+        # Traemos el premio real de la base de datos
+        premio_real = Premio.objects.get(id=premio_id)
+        
+        # Creamos un objeto falso EN MEMORIA (no afecta tu base de datos ni descuenta stock)
+        class MockEntregado:
+            pass
+            
+        entregado_falso = MockEntregado()
+        entregado_falso.nombre = "Juan"
+        entregado_falso.apellidos = "Pérez (Prueba)"
+        entregado_falso.DNI = "12345678"
+        entregado_falso.codigo_ticket = "SIMULADOR-999"
+        entregado_falso.premio = premio_real
+        
+        context = {'premio': entregado_falso}
+        
+        # Usamos tu misma lógica de desvío
+        if premio_real.es_premio:
+            return render(request, 'premio_entregado1.html', context)
+        else:
+            return render(request, 'sin_premio.html', context)
+
+    # Si entran por GET, mostramos el selector de premios
+    premios = Premio.objects.all()
+    return render(request, 'simulador_form.html', {'premios': premios})
+
+
+
