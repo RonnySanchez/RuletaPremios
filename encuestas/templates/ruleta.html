@@ -335,7 +335,7 @@
             ctx.lineWidth = 1; 
             ctx.stroke();
 
-            // 4. Texto
+            // 4. Texto con salto de línea automático
             ctx.save();
             ctx.translate(centerX, centerY);
             ctx.rotate(toRad((startDeg + endDeg) / 2));
@@ -345,7 +345,37 @@
             ctx.font = '400 16px Montserrat';
             ctx.shadowColor = "rgba(0,0,0,0.5)";
             ctx.shadowBlur = 4;
-            ctx.fillText(items[i], radius * 0.25, 0);
+
+            // Lógica para dividir en varias líneas
+            let words = items[i].split(' ');
+            let line = '';
+            let lines = [];
+            // El texto empieza al 25% del radio, le damos un ancho máximo del 65% del radio
+            let maxWidth = radius * 0.65; 
+            let lineHeight = 20; // Espaciado entre líneas (16px de letra + 4px de margen)
+
+            for (let n = 0; n < words.length; n++) {
+                let testLine = line + words[n] + ' ';
+                let metrics = ctx.measureText(testLine);
+                let testWidth = metrics.width;
+                
+                // Si el texto supera el ancho máximo, cortamos y creamos una nueva línea
+                if (testWidth > maxWidth && n > 0) {
+                    lines.push(line.trim());
+                    line = words[n] + ' ';
+                } else {
+                    line = testLine;
+                }
+            }
+            lines.push(line.trim()); // Agregamos la última línea sobrante
+
+            // Dibujar las líneas calculadas centradas verticalmente
+            let startY = 0 - ((lines.length - 1) * lineHeight) / 2;
+            
+            for (let j = 0; j < lines.length; j++) {
+                ctx.fillText(lines[j], radius * 0.25, startY + (j * lineHeight));
+            }
+            
             ctx.restore();
 
             itemDegs[items[i]] = { "startDeg": startDeg, "endDeg" : endDeg };
