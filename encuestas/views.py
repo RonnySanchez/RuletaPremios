@@ -207,29 +207,28 @@ def polls(request, encuesta_id, tienda_id, codigo_ticket=None):
 
 
 def ruleta(request, encuesta_id, tienda_id, codigo_ticket):
+    # 1. Validaciones iniciales de IDs de sistema
     tienda = get_object_or_404(Tienda, id=tienda_id, activa=True)
     encuesta_fija = get_object_or_404(EncuestaFija, id=encuesta_id)
-    respuestas = get_object_or_404(EncuestaFijaRespuesta, codigo_ticket=codigo_ticket)
+    
+    # 2. ESCUDO ANTI-404: Validar si el ticket existe en las respuestas
+    try:
+        respuestas = EncuestaFijaRespuesta.objects.get(codigo_ticket=codigo_ticket)
+    except EncuestaFijaRespuesta.DoesNotExist:
+        # En lugar de crash 404, mostramos error amigable
+        return render(request, 'RespEmitida.html', {
+            'error': "Ticket inválido o no encontrado.",
+            'texto': "Por favor, completa la encuesta primero para participar."
+        })
 
+    # 3. Verificar si el usuario ya jugó (Evitar doble premio)
+    if EncuestaFijaPremio.objects.filter(codigo_ticket=codigo_ticket, encuesta_fija=encuesta_fija).exists():
+        return render(request, 'RespEmitida.html', {
+            'error': "Ya se ha entregado un premio con este código de ticket.",
+            'texto': "Gracias por tu participación"
+        })
 
-    if codigo_ticket:
-        try:
-            # Verificar si ya existe un premio entregado con ese código de ticket
-            premio_existente = EncuestaFijaPremio.objects.get(
-                codigo_ticket=codigo_ticket, encuesta_fija=encuesta_fija
-            )
-            # Si ya existe, mostrar un mensaje o redirigir
-            return render(request, 'RespEmitida.html', {
-                'error': "Ya se ha entregado un premio con este código de ticket.",
-                'texto': "Gracias por tu participación"
-            })
-        except EncuestaFijaPremio.DoesNotExist:
-            # No existe un premio con este código, continuar con la lógica normal de la ruleta
-            pass
-
-# 'error': "Ya se ha entregado un premio con este código de ticket.",
-
-    # 2) Intentamos cargar la consulta; si no existe, monto=0
+    # 4. Cálculo de Monto y Premios Disponibles
     ticket_consulta = TicketConsulta.objects.filter(
         tienda=tienda,
         codigo=codigo_ticket
@@ -237,28 +236,25 @@ def ruleta(request, encuesta_id, tienda_id, codigo_ticket):
 
     monto = ticket_consulta.monto if ticket_consulta else Decimal('0')
      
-    # 3) Armamos la lista de premios con su stock según monto
+    # 5. Armamos la lista de premios visibles
     premios_qs = TiendaPremio.objects.filter(tienda=tienda, visible=True)
 
     premio_data = []
     for tp in premios_qs:
-        stock = tp.stock_disponible(monto)  # devuelve real o 0
-        premio_data.append({
-            'id': tp.premio.id, # Agrega el ID para que el frontend sepa identificarlo
-            'nombre': tp.premio.nombre,
-            'stock':  stock,
-            'probabilidad': stock,
-            'es_premio': tp.premio.es_premio # Nuevo campo
-        })
+        stock = tp.stock_disponible(monto)
+        # Solo enviamos a la ruleta lo que tenga stock o sea opción de "No premio"
+        if stock > 0 or not tp.premio.es_premio:
+            premio_data.append({
+                'id': tp.premio.id,
+                'nombre': tp.premio.nombre,
+                'stock': stock,
+                'probabilidad': stock,
+                'es_premio': tp.premio.es_premio 
+            })
 
-    # Obtener los premios de la tienda con su stock
-#    premios = TiendaPremio.objects.filter(tienda=tienda)
-    
-#    premio_data = [
-#        {'nombre': premio.premio.nombre, 'probabilidad': premio.cantidad}
-#        for premio in premios
-#    ]
+    # Convertimos a JSON para el motor de la ruleta en Javascript
     premios_json = json.dumps(premio_data)
+    
     context = {
         'tienda': tienda,
         'encuesta_id': encuesta_fija.id,
@@ -268,14 +264,11 @@ def ruleta(request, encuesta_id, tienda_id, codigo_ticket):
         'tipojuego': encuesta_fija.tipo_juego,
     }
     
+    # 6. Redirección al Template correspondiente
     if encuesta_fija.tipo_juego == EncuestaFija.TipoJuego.CAJAS:
-        # Redirige a la URL del juego de cajas
         return render(request, 'tabla_regalos.html', context)
-    else: # Por defecto, o si es RULETA
-        # Redirige a la URL de la ruleta
+    else:
         return render(request, 'ruleta.html', context)
-    
-
 
 
 def pideticket(request, encuesta_id, tienda_id):
