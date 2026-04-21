@@ -311,124 +311,108 @@ def pideticket(request, encuesta_id, tienda_id):
 
 
 def encuestafijaticket(request, tienda_id, encuesta_id, codigo_ticket):
-    print("Encuesta Fija Ticket - Ronny")
     encuesta_fija = get_object_or_404(EncuestaFija, id=encuesta_id, activa=True)
     tienda = get_object_or_404(Tienda, id=tienda_id, activa=True)
 
-
-
-    # Validar que la tienda esté asignada a la encuesta
+    # 1. Validar tienda asignada
     t_asignadas = encuesta_fija.get_tiendas_asignadas()
-
-
     if not t_asignadas.filter(id=tienda.id).exists():
         return render(request, 'RespEmitida.html', {
                 'error': "! No hay sorteos en esta tienda !.",
                 'texto': "Gracias por tu participación"
             })
 
-    # Verificamos si hay stock
+    # 2. Verificar stock general
     if tienda.premios_stock() <= 0:
         return render(request, 'RespEmitida.html', {
             'error': "! Se agotaron los premios !.",
             'texto': "Gracias por tu participación"
     })
 
-
+    # 3. Validación de Ticket Online (Ventas en Línea)
     if tienda.requiere_validacion_ticket:
         try:
-            # 1. Buscamos el ticket en la tabla de Ventas en Línea
             ticket = TicketVentasEnLinea.objects.get(nro_ticket=codigo_ticket)
 
-
-            # 3. Verificamos si el ticket ya fue marcado como 'utilizado'
             if ticket.utilizado:
-                # Si ya fue usado, significa que la encuesta ya se llenó.
-                # Ahora procedemos a la siguiente validación: ¿se entregó el premio?
                 try:
                     premio_existente = EncuestaFijaPremio.objects.get(codigo_ticket=codigo_ticket, encuesta_fija=encuesta_fija)
-                    # Si el premio existe, mostramos el mensaje de que ya fue entregado y terminamos.
-                    # (Reutilizo tu lógica y variables para este mensaje)
+                    
+                    # --- Lógica de mensaje dinámico ---
                     tiendaprem = premio_existente.tienda
                     nombreprem = premio_existente.nombre
                     apellidosprem = premio_existente.apellidos
                     prem = premio_existente.premio
-                    idprem = premio_existente.premio.descripcion
                     idnombre = premio_existente.respuesta.DNI
-                    errorprem = f"Este premio ya ha sido entregado en<br><h3>{tiendaprem}</h3>Cliente <br><h3>{nombreprem} {apellidosprem}</h3><h3>({idnombre})</h3>Premio <h3>{prem}</h3><span>({idprem})</span><br><br>"
+
+                    if premio_existente.premio.es_premio:
+                        # Caso: Ganó un premio físico
+                        errorprem = f"Este premio ya ha sido entregado en<br><h3>{tiendaprem}</h3>Cliente <br><h3>{nombreprem} {apellidosprem}</h3><h3>({idnombre})</h3>Premio <h3>{prem}</h3><br>"
+                    else:
+                        # Caso: Salió "Sigue intentando" o similar
+                        errorprem = f"Este ticket ya participó en la Ruleta en<br><h3>{tiendaprem}</h3>Cliente <br><h3>{nombreprem} {apellidosprem}</h3><h3>({idnombre})</h3>Resultado: <h3>{prem}</h3><br>Este ticket no obtuvo premio físico.<br>"
+                    
                     return render(request, 'RespEmitida.html', { 'error': errorprem, 'texto': "¡Gracias por participar!" })
+                
                 except EncuestaFijaPremio.DoesNotExist:
-                    # Si la encuesta fue llenada ('utilizado'=True) pero el premio NO ha sido entregado,
-                    # lo enviamos directamente a la ruleta.
                     return redirect('ruleta', encuesta_id=encuesta_id, tienda_id=tienda.id, codigo_ticket=codigo_ticket)
+            
             else:
-                # Si el ticket no ha sido usado, verificamos si está vigente
-                # 2. Verificamos si ha expirado (esto es una validación final)   'texto': timezone.now().strftime("%d/%m/%Y %H:%M:%S")
                 if ticket.esta_vencido():
-                    #  texto_final = f"{timezone.now().strftime('%d/%m/%Y %H:%M:%S')}  -  {ticket.vigencia.strftime('%d/%m/%Y %H:%M:%S')}"
                     return render(request, 'RespEmitida.html', {
                         'error': "Lo sentimos, este código de ticket ha expirado.",
                         'texto': "¡Gracias por participar!"
                     })
-                pass
         except TicketVentasEnLinea.DoesNotExist:
-            # Si el ticket no existe, es inválido.
             return render(request, 'RespEmitida.html', {
                 'error': "El código de ticket ingresado no es válido.",
                 'texto': "Gracias por tu participación"
             })
-    # No requiere validación de ticket
 
-
-    # Validar si ya existe una respuesta con el mismo código de ticket (si el código fue proporcionado)
+    # 4. Validación para tickets generales / Sin validación online obligatoria
     plantilla = 'poll_f1.html'
     if codigo_ticket:
         try:
-            # Si existe una respuesta con ese código y encuesta, redirigir o mostrar error
             respuesta_existente = EncuestaFijaRespuesta.objects.get(codigo_ticket=codigo_ticket, encuesta_fija=encuesta_fija)
-
             try:
-                # Verificar si ya existe un premio entregado con ese código de ticket
-                premio_existente = EncuestaFijaPremio.objects.get(
-                    codigo_ticket=codigo_ticket, encuesta_fija=encuesta_fija
-                )
-                # Si ya existe, mostrar un mensaje o redirigir
+                premio_existente = EncuestaFijaPremio.objects.get(codigo_ticket=codigo_ticket, encuesta_fija=encuesta_fija)
+                
                 tiendaprem = premio_existente.tienda
                 nombreprem = premio_existente.nombre
                 apellidosprem = premio_existente.apellidos
                 prem = premio_existente.premio
-                idprem = premio_existente.premio.descripcion
                 idnombre = premio_existente.respuesta.DNI
-                errorprem = f"Este premio ya ha sido entregado en<br><h3>{tiendaprem}</h3>Cliente Ganador<br><h3>{nombreprem} {apellidosprem}</h3><h3>({idnombre})</h3>Premio <h3>{prem}</h3><span>({idprem})</span><br><br>"
+
+                if premio_existente.premio.es_premio:
+                    # Mensaje para Ganadores
+                    errorprem = f"Este premio ya ha sido entregado en<br><h3>{tiendaprem}</h3>Cliente Ganador<br><h3>{nombreprem} {apellidosprem}</h3><h3>({idnombre})</h3>Premio <h3>{prem}</h3><br>"
+                else:
+                    # Mensaje para No Ganadores
+                    errorprem = f"Este ticket ya participó en la Ruleta en<br><h3>{tiendaprem}</h3>Cliente <br><h3>{nombreprem} {apellidosprem}</h3><h3>({idnombre})</h3>Resultado: <h3>{prem}</h3><br>No se obtuvo un premio físico en esta ocasión.<br>"
+
                 return render(request, 'RespEmitida.html', {
                     'error': errorprem,
                     'texto': "¡Gracias por participar en nuestra Ruleta de Premios!"
                 })
             except EncuestaFijaPremio.DoesNotExist:
-                # No existe un premio con este código, continuar con la lógica normal de la ruleta
                 return redirect('ruleta', encuesta_id=encuesta_id, tienda_id=tienda.id, codigo_ticket=codigo_ticket)
-                pass
         except EncuestaFijaRespuesta.DoesNotExist:
-            # No existe una respuesta con este código, continuar con la lógica normal
             pass
     else:
-        plantilla = 'ticket.html'    
+        plantilla = 'ticket.html'
 
+    # 5. Manejo del POST (Guardar Encuesta)
     if request.method == 'POST':
         form = EncuestaFijaForm(request.POST)
         if form.is_valid():
             codigo_ticket_form = form.cleaned_data['codigo_ticket']
-            # Validar si ya existe una respuesta con el mismo código de ticket y encuesta fija
-            if EncuestaFijaRespuesta.objects.filter(
-                codigo_ticket=codigo_ticket_form, encuesta_fija=encuesta_fija
-            ).exists():
-                # Si existe una respuesta, muestra un error
+            
+            if EncuestaFijaRespuesta.objects.filter(codigo_ticket=codigo_ticket_form, encuesta_fija=encuesta_fija).exists():
                 return render(request, 'RespEmitida.html', {
                     'error': "Ya se ha enviado una respuesta..",
                     'texto': "Gracias por tu participación"
                 })            
-            # Procesa los datos
-            # Crear una instancia del modelo EncuestaFijaRespuesta y llenarla con los datos del formulario
+            
             respuesta = EncuestaFijaRespuesta(
                 encuesta_fija=encuesta_fija,
                 nombre=form.cleaned_data['nombre'],
@@ -440,32 +424,22 @@ def encuestafijaticket(request, tienda_id, encuesta_id, codigo_ticket):
                 DNI=form.cleaned_data['DNI'],
                 tienda = Tienda.objects.get(id=tienda_id),
                 acepPolPriv=form.cleaned_data['acepPolPriv'],
-                acepProm=form.cleaned_data.get('acepProm', False),  # Este campo es opcional
-                # --- Asignar los nuevos campos de valoración ---
+                acepProm=form.cleaned_data.get('acepProm', False),
                 valoracion_producto=form.cleaned_data['valoracion_producto'],
                 valoracion_atencion=form.cleaned_data['valoracion_atencion'],
                 probabilidad_recomendacion=form.cleaned_data['probabilidad_recomendacion'],
                 comentarios_adicionales=form.cleaned_data.get('comentarios_adicionales')
             )
-            # Guardar la respuesta en la base de datos
             respuesta.save()
 
-
-            # --- NUEVO: MARCAMOS EL TICKET ONLINE COMO UTILIZADO ---
             if tienda.requiere_validacion_ticket:
                 try:
                     ticket_a_marcar = TicketVentasEnLinea.objects.get(nro_ticket=codigo_ticket_form)
                     ticket_a_marcar.utilizado = True
                     ticket_a_marcar.save()
-                    print(f"Ticket {ticket_a_marcar.nro_ticket} marcado como utilizado.")
                 except TicketVentasEnLinea.DoesNotExist:
-                    # Esto no debería pasar si la validación inicial funcionó, pero es una buena práctica manejarlo
                     pass
-            # --------------------------------------------------------
 
-
-            # Redirigir a una página de confirmación o agradecimiento
-            print('Respuesta Almacenada')
             return redirect('ruleta', encuesta_id=encuesta_id, tienda_id=tienda.id, codigo_ticket=codigo_ticket)
     else:
         initial_data = {'codigo_ticket': codigo_ticket} if codigo_ticket else {}
@@ -480,9 +454,6 @@ def encuestafijaticket(request, tienda_id, encuesta_id, codigo_ticket):
     }
 
     return render(request, plantilla, context)
-
-
-
 
 
 
