@@ -388,7 +388,7 @@ def encuestafijaticket(request, tienda_id, encuesta_id, codigo_ticket):
                     errorprem = f"Este premio ya ha sido entregado en<br><h3>{tiendaprem}</h3>Cliente Ganador<br><h3>{nombreprem} {apellidosprem}</h3><h3>({idnombre})</h3>Premio <h3>{prem}</h3><br>"
                 else:
                     # Mensaje para No Ganadores
-                    errorprem = f"Este ticket ya participó en la Ruleta en<br><h3>{tiendaprem}</h3>Cliente <br><h3>{nombreprem} {apellidosprem}</h3><h3>({idnombre})</h3>Resultado: <h3>{prem}</h3><br>No se obtuvo un premio físico en esta ocasión.<br>"
+                    errorprem = f"Este ticket ya participó en la Ruleta en<br><h3>{tiendaprem}</h3>Cliente <br><h3>{nombreprem} {apellidosprem}</h3><h3>({idnombre})</h3>Resultado: <h3>Tu ticket no obtuvo un premio en esta oportunidad.</h3><br>"
 
                 return render(request, 'RespEmitida.html', {
                     'error': errorprem,
