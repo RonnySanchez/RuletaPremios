@@ -16,6 +16,6 @@ urlpatterns = [
     path('simulador/', views.simulador_pantallas, name='simulador_pantallas'),
     path('ejecutar-sorteo-ajax/', views.ejecutar_sorteo_ajax, name='ejecutar_sorteo_ajax'),
     path('api/<int:tienda_id>/', views.consultaEncuestaFijaTiendaApi, name='consultaApi'),
-    path('encuesta-completada/', views.encuesta_completada, name='encuesta_completada'),
+#    path('encuesta-completada/', views.encuesta_completada, name='encuesta_completada'),
 ]
 
