@@ -85,6 +85,25 @@
         --bs-table-striped-bg: rgba(255,255,255,0.04);
         --bs-table-hover-bg: rgba(255,255,255,0.06);
     }
+    .sim-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .sim-meta .badge {
+        font-size: 0.95rem;
+        padding: 0.6rem 0.8rem;
+    }
+    .table-sm th, .table-sm td {
+        padding: 0.55rem 0.65rem;
+        vertical-align: middle;
+    }
+    .table th {
+        white-space: nowrap;
+    }
+    .premio-col {
+        min-width: 220px;
+    }
 </style>
 {% endblock %}
 
@@ -136,16 +155,18 @@
         </div>
 
         {% if tienda %}
-        <div class="col-lg-6">
-            <div class="card h-100">
+        <div class="col-12">
+            <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span>Vista de ruleta</span>
                     <span class="badge badge-soft">{{ tienda.nombre }}</span>
                 </div>
                 <div class="card-body">
                     {% if detalle_premios %}
-                        <div class="mb-3 small text-white-50">
-                            Encuesta: <strong>{{ encuesta.titulo }}</strong> · Monto simulado: <strong>{{ monto }}</strong> · Fecha simulada: <strong>{{ fecha_referencia|date:'d/m/Y' }}</strong>
+                        <div class="mb-3 sim-meta">
+                            <span class="badge text-bg-secondary">Encuesta: {{ encuesta.titulo }}</span>
+                            <span class="badge text-bg-secondary">Monto: {{ monto }}</span>
+                            <span class="badge text-bg-secondary">Fecha: {{ fecha_referencia|date:'d/m/Y' }}</span>
                         </div>
                     {% endif %}
                     <div id="sin-segmentos" class="alert alert-warning d-none">
@@ -164,15 +185,15 @@
             </div>
         </div>
 
-        <div class="col-lg-6">
-            <div class="card h-100">
+        <div class="col-12">
+            <div class="card">
                 <div class="card-header">Detalle de premios visibles de la tienda</div>
                 <div class="card-body table-responsive">
-                    <table class="table table-dark table-striped align-middle mb-0">
+                    <table class="table table-dark table-striped table-sm align-middle mb-0">
                         <thead>
                             <tr>
                                 <th>Orden</th>
-                                <th>Premio</th>
+                                <th class="premio-col">Premio</th>
                                 <th>Tipo</th>
                                 <th>Stock base</th>
                                 <th>Stock simulado</th>
@@ -186,7 +207,7 @@
                             {% for item in detalle_premios %}
                             <tr>
                                 <td>{{ item.orden }}</td>
-                                <td>{{ item.nombre }}</td>
+                                <td class="premio-col">{{ item.nombre }}</td>
                                 <td>
                                     {% if item.es_premio %}
                                         <span class="badge text-bg-success">Real</span>

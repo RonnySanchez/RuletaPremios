@@ -42,7 +42,7 @@ def _stock_simulado(tienda_premio, monto, fecha_referencia):
     return tienda_premio.cantidad
 
 
-def _build_ruleta_simulador_data(tienda, monto, fecha_referencia):
+def _build_ruleta_visual_data(tienda, monto, fecha_referencia):
     premios_qs = TiendaPremio.objects.filter(tienda=tienda, visible=True).select_related('premio')
 
     premio_data = []
@@ -299,21 +299,14 @@ def ruleta(request, encuesta_id, tienda_id, codigo_ticket):
 
     monto = ticket_consulta.monto if ticket_consulta else Decimal('0')
      
-    # 5. Armamos la lista de premios visibles
-    premios_qs = TiendaPremio.objects.filter(tienda=tienda, visible=True)
-
-    premio_data = []
-    for tp in premios_qs:
-        stock = tp.stock_disponible(monto)
-        # Solo enviamos a la ruleta lo que tenga stock o sea opción de "No premio"
-        if stock > 0 or not tp.premio.es_premio:
-            premio_data.append({
-                'id': tp.premio.id,
-                'nombre': tp.premio.nombre,
-                'stock': stock,
-                'probabilidad': stock,
-                'es_premio': tp.premio.es_premio 
-            })
+    # 5. Armamos la lista visual de premios
+    # La visibilidad depende solo de TiendaPremio.visible.
+    # El stock/probabilidad real sigue condicionado por monto y fecha.
+    premio_data, _ = _build_ruleta_visual_data(
+        tienda=tienda,
+        monto=monto,
+        fecha_referencia=timezone.now().date()
+    )
 
     # Convertimos a JSON para el motor de la ruleta en Javascript
     premios_json = json.dumps(premio_data)
@@ -698,7 +691,7 @@ def simulador_ruleta_tienda(request):
             if tienda_id and str(tienda_id).isdigit():
                 tienda = tiendas.filter(id=tienda_id).first()
                 if tienda:
-                    premio_data, detalle_premios = _build_ruleta_simulador_data(
+                    premio_data, detalle_premios = _build_ruleta_visual_data(
                         tienda=tienda,
                         monto=monto,
                         fecha_referencia=fecha_referencia
