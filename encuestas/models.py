@@ -4,6 +4,7 @@ from django.utils import timezone
 from django.urls import reverse
 from decimal import Decimal
 from django.db import models, transaction
+from django.core.exceptions import ValidationError
 from django.utils.html import format_html
 
 
@@ -245,6 +246,17 @@ class TiendaPremio(models.Model):
 
     def __str__(self):
         return f'{self.tienda.nombre} - {self.premio.nombre} (Cantidad: {self.cantidad})'
+
+    def clean(self):
+        if self.premio_id and not self.premio.es_premio and self.monto_minimo_premio != Decimal('0'):
+            raise ValidationError({
+                'monto_minimo_premio': 'Los premios no reales deben tener monto mínimo igual a 0.'
+            })
+
+    def save(self, *args, **kwargs):
+        if self.premio_id and not self.premio.es_premio:
+            self.monto_minimo_premio = Decimal('0')
+        super().save(*args, **kwargs)
 
 
     def obtener_premios_y_probabilidades(self, monto: Decimal):

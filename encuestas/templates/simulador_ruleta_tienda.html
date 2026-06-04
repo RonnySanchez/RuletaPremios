@@ -169,9 +169,11 @@
                             <span class="badge text-bg-secondary">Fecha: {{ fecha_referencia|date:'d/m/Y' }}</span>
                         </div>
                     {% endif %}
-                    <div id="sin-segmentos" class="alert alert-warning d-none">
-                        Con esta configuración no hay segmentos visibles en la ruleta.
+                    {% if not hay_stock_sorteable %}
+                    <div class="alert alert-warning mb-0">
+                        Con este monto y esta fecha, todos los premios tienen stock simulado 0. La ruleta no se mostraría al cliente.
                     </div>
+                    {% else %}
                     <div class="ruleta-frame">
                         <div class="ruleta-wrapper w-100">
                             <canvas class="ruleta" id="canvas" width="480" height="480"></canvas>
@@ -181,6 +183,7 @@
                             </div>
                         </div>
                     </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -421,11 +424,6 @@
         }
 
         document.fonts.ready.then(draw);
-    } else {
-        const warning = document.getElementById('sin-segmentos');
-        if (warning) {
-            warning.classList.remove('d-none');
-        }
     }
 </script>
 {% endblock %}

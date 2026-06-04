@@ -47,10 +47,13 @@ def _build_ruleta_visual_data(tienda, monto, fecha_referencia):
 
     premio_data = []
     detalle_premios = []
+    hay_stock_sorteable = False
 
     for tp in premios_qs:
         stock = _stock_simulado(tp, monto, fecha_referencia)
         visible_en_ruleta = tp.visible
+        participa_sorteo = stock > 0
+        hay_stock_sorteable = hay_stock_sorteable or participa_sorteo
 
         detalle = {
             'id': tp.premio.id,
@@ -62,7 +65,7 @@ def _build_ruleta_visual_data(tienda, monto, fecha_referencia):
             'fecha_activacion': tp.fecha_activacion,
             'orden': tp.orden,
             'visible_en_ruleta': visible_en_ruleta,
-            'participa_sorteo': stock > 0,
+            'participa_sorteo': participa_sorteo,
         }
         detalle_premios.append(detalle)
 
@@ -75,7 +78,7 @@ def _build_ruleta_visual_data(tienda, monto, fecha_referencia):
                 'es_premio': tp.premio.es_premio,
             })
 
-    return premio_data, detalle_premios
+    return premio_data, detalle_premios, hay_stock_sorteable
 
 
 
@@ -302,11 +305,17 @@ def ruleta(request, encuesta_id, tienda_id, codigo_ticket):
     # 5. Armamos la lista visual de premios
     # La visibilidad depende solo de TiendaPremio.visible.
     # El stock/probabilidad real sigue condicionado por monto y fecha.
-    premio_data, _ = _build_ruleta_visual_data(
+    premio_data, _, hay_stock_sorteable = _build_ruleta_visual_data(
         tienda=tienda,
         monto=monto,
         fecha_referencia=timezone.now().date()
     )
+
+    if not hay_stock_sorteable:
+        return render(request, 'RespEmitida.html', {
+            'error': "No hay premios disponibles para este ticket en este momento.",
+            'texto': "Gracias por tu participación"
+        })
 
     # Convertimos a JSON para el motor de la ruleta en Javascript
     premios_json = json.dumps(premio_data)
@@ -678,6 +687,7 @@ def simulador_ruleta_tienda(request):
     tienda = None
     premios_json = json.dumps([])
     detalle_premios = []
+    hay_stock_sorteable = False
     monto = _parse_decimal(request.GET.get('monto', '0'))
     fecha_referencia = _parse_date(request.GET.get('fecha'))
     encuesta_id = request.GET.get('encuesta_id')
@@ -691,7 +701,7 @@ def simulador_ruleta_tienda(request):
             if tienda_id and str(tienda_id).isdigit():
                 tienda = tiendas.filter(id=tienda_id).first()
                 if tienda:
-                    premio_data, detalle_premios = _build_ruleta_visual_data(
+                    premio_data, detalle_premios, hay_stock_sorteable = _build_ruleta_visual_data(
                         tienda=tienda,
                         monto=monto,
                         fecha_referencia=fecha_referencia
@@ -706,6 +716,7 @@ def simulador_ruleta_tienda(request):
         'tienda': tienda,
         'premiosDat': premios_json,
         'detalle_premios': detalle_premios,
+        'hay_stock_sorteable': hay_stock_sorteable if tienda else False,
         'monto': monto,
         'fecha_referencia': fecha_referencia,
         'encuesta_id_seleccionada': int(encuesta_id) if encuesta_id and str(encuesta_id).isdigit() else None,
