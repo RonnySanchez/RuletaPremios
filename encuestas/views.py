@@ -669,6 +669,16 @@ def simulador_ruleta_tienda(request):
         return redirect('index')
 
     encuestas = EncuestaFija.objects.filter(activa=True).order_by('titulo')
+    encuestas_tiendas_map = {}
+
+    for item in encuestas:
+        encuestas_tiendas_map[str(item.id)] = [
+            {
+                'id': tienda.id,
+                'nombre': tienda.nombre,
+            }
+            for tienda in item.get_tiendas_asignadas().filter(activa=True).order_by('nombre')
+        ]
 
     encuesta = None
     tiendas = Tienda.objects.none()
@@ -699,6 +709,7 @@ def simulador_ruleta_tienda(request):
         'encuestas': encuestas,
         'encuesta': encuesta,
         'tiendas': tiendas,
+        'encuestas_tiendas_map': json.dumps(encuestas_tiendas_map),
         'tienda': tienda,
         'premiosDat': premios_json,
         'detalle_premios': detalle_premios,

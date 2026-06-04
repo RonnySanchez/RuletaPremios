@@ -230,15 +230,50 @@
 
 {% block js_footer %}
 <script id="premios-data" type="application/json">{{ premiosDat|safe }}</script>
+<script id="encuestas-tiendas-data" type="application/json">{{ encuestas_tiendas_map|safe }}</script>
 <script>
     const encuestaSelect = document.getElementById('encuesta_id');
-    if (encuestaSelect) {
-        encuestaSelect.addEventListener('change', function() {
-            const tiendaSelect = document.getElementById('tienda_id');
-            if (tiendaSelect) {
-                tiendaSelect.value = '';
+    const tiendaSelect = document.getElementById('tienda_id');
+    const encuestasTiendasMap = JSON.parse(document.getElementById('encuestas-tiendas-data').textContent);
+    const tiendaSeleccionada = "{{ tienda_id_seleccionada|default_if_none:'' }}";
+
+    function renderTiendas(encuestaId, tiendaIdActual = '') {
+        if (!tiendaSelect) {
+            return;
+        }
+
+        const tiendas = encuestasTiendasMap[String(encuestaId)] || [];
+        tiendaSelect.innerHTML = '';
+
+        if (!encuestaId) {
+            tiendaSelect.disabled = true;
+            tiendaSelect.innerHTML = '<option value="">-- Primero elige una encuesta --</option>';
+            return;
+        }
+
+        tiendaSelect.disabled = false;
+
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = tiendas.length ? '-- Selecciona una tienda --' : '-- Esta encuesta no tiene tiendas activas --';
+        tiendaSelect.appendChild(placeholder);
+
+        tiendas.forEach(function(tienda) {
+            const option = document.createElement('option');
+            option.value = tienda.id;
+            option.textContent = tienda.nombre;
+            if (String(tienda.id) === String(tiendaIdActual)) {
+                option.selected = true;
             }
-            this.form.submit();
+            tiendaSelect.appendChild(option);
+        });
+    }
+
+    if (encuestaSelect) {
+        renderTiendas(encuestaSelect.value, tiendaSeleccionada);
+
+        encuestaSelect.addEventListener('change', function() {
+            renderTiendas(this.value, '');
         });
     }
 
