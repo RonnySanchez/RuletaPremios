@@ -668,32 +668,43 @@ def simulador_ruleta_tienda(request):
     if not request.user.is_staff:
         return redirect('index')
 
-    tiendas = Tienda.objects.filter(activa=True).order_by('nombre')
+    encuestas = EncuestaFija.objects.filter(activa=True).order_by('titulo')
 
+    encuesta = None
+    tiendas = Tienda.objects.none()
     tienda = None
     premios_json = json.dumps([])
     detalle_premios = []
     monto = _parse_decimal(request.GET.get('monto', '0'))
     fecha_referencia = _parse_date(request.GET.get('fecha'))
+    encuesta_id = request.GET.get('encuesta_id')
     tienda_id = request.GET.get('tienda_id')
 
-    if tienda_id:
-        tienda = Tienda.objects.filter(id=tienda_id, activa=True).first()
-        if tienda:
-            premio_data, detalle_premios = _build_ruleta_simulador_data(
-                tienda=tienda,
-                monto=monto,
-                fecha_referencia=fecha_referencia
-            )
-            premios_json = json.dumps(premio_data)
+    if encuesta_id and str(encuesta_id).isdigit():
+        encuesta = EncuestaFija.objects.filter(id=encuesta_id, activa=True).first()
+        if encuesta:
+            tiendas = encuesta.get_tiendas_asignadas().filter(activa=True).order_by('nombre')
+
+            if tienda_id and str(tienda_id).isdigit():
+                tienda = tiendas.filter(id=tienda_id).first()
+                if tienda:
+                    premio_data, detalle_premios = _build_ruleta_simulador_data(
+                        tienda=tienda,
+                        monto=monto,
+                        fecha_referencia=fecha_referencia
+                    )
+                    premios_json = json.dumps(premio_data)
 
     context = {
+        'encuestas': encuestas,
+        'encuesta': encuesta,
         'tiendas': tiendas,
         'tienda': tienda,
         'premiosDat': premios_json,
         'detalle_premios': detalle_premios,
         'monto': monto,
         'fecha_referencia': fecha_referencia,
+        'encuesta_id_seleccionada': int(encuesta_id) if encuesta_id and str(encuesta_id).isdigit() else None,
         'tienda_id_seleccionada': int(tienda_id) if tienda_id and str(tienda_id).isdigit() else None,
     }
     return render(request, 'simulador_ruleta_tienda.html', context)
