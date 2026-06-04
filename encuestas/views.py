@@ -313,7 +313,7 @@ def ruleta(request, encuesta_id, tienda_id, codigo_ticket):
 
     if not hay_stock_sorteable:
         return render(request, 'RespEmitida.html', {
-            'error': "No hay premios disponibles para este ticket en este momento.",
+            'error': "No hay premios disponibles en este momento.",
             'texto': "Gracias por tu participación"
         })
 
@@ -390,7 +390,7 @@ def encuestafijaticket(request, tienda_id, encuesta_id, codigo_ticket):
     # 2. Verificar stock general
     if tienda.premios_stock() <= 0:
         return render(request, 'RespEmitida.html', {
-            'error': "! Se agotaron los premios !.",
+            'error': "No hay premios disponibles en este momento.",
             'texto': "Gracias por tu participación"
     })
 
