@@ -14,6 +14,7 @@ urlpatterns = [
     path('guardar-premio1/', views.guardar_premio, name='guardar_premio1'),
     path('juego-regalos/<int:encuesta_id>/<int:tienda_id>/<str:codigo_ticket>', views.vista_juego_regalos, name='juego_regalos'),
     path('simulador/', views.simulador_pantallas, name='simulador_pantallas'),
+    path('simulador/ruleta-tiendas/', views.simulador_ruleta_tienda, name='simulador_ruleta_tienda'),
     path('ejecutar-sorteo-ajax/', views.ejecutar_sorteo_ajax, name='ejecutar_sorteo_ajax'),
     path('api/<int:tienda_id>/', views.consultaEncuestaFijaTiendaApi, name='consultaApi'),
 #    path('encuesta-completada/', views.encuesta_completada, name='encuesta_completada'),

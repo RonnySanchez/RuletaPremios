@@ -1,5 +1,6 @@
 from django.utils import timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
+from datetime import datetime
 import random
 from django.shortcuts import get_object_or_404, render, redirect
 from django.core.serializers import serialize
@@ -13,6 +14,68 @@ from .forms import EncuestaForm, EncuestaFijaForm, TicketForm
 from django.utils.html import format_html
 from django.db.models import F
 import json
+
+
+def _parse_decimal(value, default='0'):
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return Decimal(default)
+
+
+def _parse_date(value):
+    if not value:
+        return timezone.now().date()
+    try:
+        return datetime.strptime(value, '%Y-%m-%d').date()
+    except ValueError:
+        return timezone.now().date()
+
+
+def _stock_simulado(tienda_premio, monto, fecha_referencia):
+    if monto < tienda_premio.monto_minimo_premio:
+        return 0
+
+    if tienda_premio.fecha_activacion and tienda_premio.fecha_activacion > fecha_referencia:
+        return 0
+
+    return tienda_premio.cantidad
+
+
+def _build_ruleta_simulador_data(tienda, monto, fecha_referencia):
+    premios_qs = TiendaPremio.objects.filter(tienda=tienda, visible=True).select_related('premio')
+
+    premio_data = []
+    detalle_premios = []
+
+    for tp in premios_qs:
+        stock = _stock_simulado(tp, monto, fecha_referencia)
+        visible_en_ruleta = stock > 0 or not tp.premio.es_premio
+
+        detalle = {
+            'id': tp.premio.id,
+            'nombre': tp.premio.nombre,
+            'es_premio': tp.premio.es_premio,
+            'stock_configurado': tp.cantidad,
+            'stock_simulado': stock,
+            'monto_minimo_premio': tp.monto_minimo_premio,
+            'fecha_activacion': tp.fecha_activacion,
+            'orden': tp.orden,
+            'visible_en_ruleta': visible_en_ruleta,
+            'participa_sorteo': stock > 0,
+        }
+        detalle_premios.append(detalle)
+
+        if visible_en_ruleta:
+            premio_data.append({
+                'id': tp.premio.id,
+                'nombre': tp.premio.nombre,
+                'stock': stock,
+                'probabilidad': stock,
+                'es_premio': tp.premio.es_premio,
+            })
+
+    return premio_data, detalle_premios
 
 
 
@@ -599,6 +662,41 @@ def simulador_pantallas(request):
     # Si entran por GET, mostramos el selector de premios
     premios = Premio.objects.all()
     return render(request, 'simulador_form.html', {'premios': premios})
+
+
+def simulador_ruleta_tienda(request):
+    if not request.user.is_staff:
+        return redirect('index')
+
+    tiendas = Tienda.objects.filter(activa=True).order_by('nombre')
+
+    tienda = None
+    premios_json = json.dumps([])
+    detalle_premios = []
+    monto = _parse_decimal(request.GET.get('monto', '0'))
+    fecha_referencia = _parse_date(request.GET.get('fecha'))
+    tienda_id = request.GET.get('tienda_id')
+
+    if tienda_id:
+        tienda = Tienda.objects.filter(id=tienda_id, activa=True).first()
+        if tienda:
+            premio_data, detalle_premios = _build_ruleta_simulador_data(
+                tienda=tienda,
+                monto=monto,
+                fecha_referencia=fecha_referencia
+            )
+            premios_json = json.dumps(premio_data)
+
+    context = {
+        'tiendas': tiendas,
+        'tienda': tienda,
+        'premiosDat': premios_json,
+        'detalle_premios': detalle_premios,
+        'monto': monto,
+        'fecha_referencia': fecha_referencia,
+        'tienda_id_seleccionada': int(tienda_id) if tienda_id and str(tienda_id).isdigit() else None,
+    }
+    return render(request, 'simulador_ruleta_tienda.html', context)
 
 
 

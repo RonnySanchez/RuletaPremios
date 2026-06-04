@@ -1,0 +1,355 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Simulador de Ruleta por Tienda{% endblock title %}
+
+{% block header %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100..900&display=swap" rel="stylesheet">
+<style>
+    body {
+        background-color: #003468 !important;
+        font-family: "Montserrat", sans-serif !important;
+        color: #eeeeee !important;
+    }
+    .card, .card-header, .card-body {
+        background-color: rgba(0, 0, 0, 0.18) !important;
+        border-color: rgba(255,255,255,0.12) !important;
+    }
+    .ruleta-frame {
+        position: relative;
+        width: 100%;
+        max-width: 550px;
+        aspect-ratio: 1 / 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto;
+        filter: drop-shadow(0px 10px 15px rgba(0, 0, 0, 0.3));
+    }
+    .ruleta-frame::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image: url("{% static 'images/Aro Ruleta 4.png' %}");
+        background-size: contain;
+        background-repeat: no-repeat;
+        z-index: 10;
+        pointer-events: none;
+    }
+    .ruleta-wrapper {
+        position: relative;
+    }
+    .triangle {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%) rotate(45deg);
+        z-index: 11;
+        width: 10%;
+        height: 10%;
+        right: -3%;
+        background: linear-gradient(135deg, #E1253C, #c54954, #97222D);
+        border-radius: 50% 50% 50% 0;
+        box-shadow: -2px 2px 5px rgba(0,0,0,0.4), inset 1px -1px 2px rgba(0,0,0,0.3), inset 2px 2px 4px rgba(255,255,255,0.6);
+    }
+    .ruleta, #canvas {
+        width: 100%;
+        height: 100%;
+    }
+    .center-circle {
+        width: 20%;
+        height: 20%;
+        border-radius: 50%;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(circle at 50% 35%, #FFFFFF, #979797 85%, #494949 100%);
+        box-shadow: inset 0px 5px 10px rgba(255, 255, 255, 0.5), inset 0px -5px 15px rgba(0, 0, 0, 0.3), 0px 10px 20px rgba(0, 0, 0, 0.4);
+        z-index: 11;
+    }
+    .center-image {
+        width: 60%;
+        filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.4));
+    }
+    .badge-soft {
+        background-color: rgba(255,255,255,0.14);
+        color: #fff;
+    }
+    .table-dark {
+        --bs-table-bg: rgba(0,0,0,0.18);
+        --bs-table-striped-bg: rgba(255,255,255,0.04);
+        --bs-table-hover-bg: rgba(255,255,255,0.06);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row g-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Simulador realista de ruleta por tienda</h4>
+                </div>
+                <div class="card-body">
+                    <form method="get" action="{% url 'simulador_ruleta_tienda' %}" class="row g-3 align-items-end">
+                        <div class="col-md-5">
+                            <label for="tienda_id" class="form-label">Tienda</label>
+                            <select name="tienda_id" id="tienda_id" class="form-select" required>
+                                <option value="">-- Selecciona una tienda --</option>
+                                {% for item in tiendas %}
+                                    <option value="{{ item.id }}" {% if tienda_id_seleccionada == item.id %}selected{% endif %}>{{ item.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="monto" class="form-label">Monto</label>
+                            <input type="number" step="0.01" min="0" name="monto" id="monto" class="form-control" value="{{ monto }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="fecha" class="form-label">Fecha</label>
+                            <input type="date" name="fecha" id="fecha" class="form-control" value="{{ fecha_referencia|date:'Y-m-d' }}">
+                        </div>
+                        <div class="col-md-2 d-grid">
+                            <button type="submit" class="btn btn-light">Ver simulación</button>
+                        </div>
+                    </form>
+                    <div class="mt-3 small text-white-50">
+                        Replica exactamente el filtro actual de producción: <code>stock &gt; 0 or not tp.premio.es_premio</code>.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if tienda %}
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Vista de ruleta</span>
+                    <span class="badge badge-soft">{{ tienda.nombre }}</span>
+                </div>
+                <div class="card-body">
+                    {% if detalle_premios %}
+                        <div class="mb-3 small text-white-50">
+                            Monto simulado: <strong>{{ monto }}</strong> · Fecha simulada: <strong>{{ fecha_referencia|date:'d/m/Y' }}</strong>
+                        </div>
+                    {% endif %}
+                    <div id="sin-segmentos" class="alert alert-warning d-none">
+                        Con esta configuración no hay segmentos visibles en la ruleta.
+                    </div>
+                    <div class="ruleta-frame">
+                        <div class="ruleta-wrapper w-100">
+                            <canvas class="ruleta" id="canvas" width="480" height="480"></canvas>
+                            <div class="triangle"></div>
+                            <div class="center-circle">
+                                <img src="{% static 'img/LogoLetrasEF.png' %}" alt="Logo" class="center-image">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">Detalle de premios visibles de la tienda</div>
+                <div class="card-body table-responsive">
+                    <table class="table table-dark table-striped align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Orden</th>
+                                <th>Premio</th>
+                                <th>Tipo</th>
+                                <th>Stock base</th>
+                                <th>Stock simulado</th>
+                                <th>Mínimo</th>
+                                <th>Activa desde</th>
+                                <th>Ruleta</th>
+                                <th>Sorteo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in detalle_premios %}
+                            <tr>
+                                <td>{{ item.orden }}</td>
+                                <td>{{ item.nombre }}</td>
+                                <td>
+                                    {% if item.es_premio %}
+                                        <span class="badge text-bg-success">Real</span>
+                                    {% else %}
+                                        <span class="badge text-bg-secondary">No real</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ item.stock_configurado }}</td>
+                                <td>{{ item.stock_simulado }}</td>
+                                <td>{{ item.monto_minimo_premio }}</td>
+                                <td>{% if item.fecha_activacion %}{{ item.fecha_activacion|date:'d/m/Y' }}{% else %}-{% endif %}</td>
+                                <td>
+                                    {% if item.visible_en_ruleta %}
+                                        <span class="badge text-bg-info">Aparece</span>
+                                    {% else %}
+                                        <span class="badge text-bg-dark">Oculto</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if item.participa_sorteo %}
+                                        <span class="badge text-bg-warning">Participa</span>
+                                    {% else %}
+                                        <span class="badge text-bg-dark">Stock 0</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="9" class="text-center text-white-50">La tienda no tiene premios visibles configurados.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block js_footer %}
+<script id="premios-data" type="application/json">{{ premiosDat|safe }}</script>
+<script>
+    function createStripesPattern() {
+        const patternCanvas = document.createElement('canvas');
+        const patternCtx = patternCanvas.getContext('2d');
+        patternCanvas.width = 10;
+        patternCanvas.height = 10;
+        patternCtx.strokeStyle = 'rgba(0, 0, 0, 0.08)';
+        patternCtx.lineWidth = 1;
+        patternCtx.beginPath();
+        patternCtx.moveTo(0, 10);
+        patternCtx.lineTo(10, 0);
+        patternCtx.stroke();
+        return patternCtx.createPattern(patternCanvas, 'repeat');
+    }
+
+    function toRad(deg) { return deg * (Math.PI / 180.0); }
+
+    function LightenDarkenColor(col, amt) {
+        let usePound = false;
+        if (col[0] === "#") { col = col.slice(1); usePound = true; }
+        let num = parseInt(col, 16);
+        let r = (num >> 16) + amt;
+        r = Math.max(Math.min(255, r), 0);
+        let b = ((num >> 8) & 0x00FF) + amt;
+        b = Math.max(Math.min(255, b), 0);
+        let g = (num & 0x0000FF) + amt;
+        g = Math.max(Math.min(255, g), 0);
+        return (usePound ? "#" : "") + (g | (b << 8) | (r << 16)).toString(16).padStart(6, '0');
+    }
+
+    const premiosData = JSON.parse(document.getElementById('premios-data').textContent);
+    const items = premiosData.map(premio => premio.nombre);
+    const canvas = document.getElementById("canvas");
+
+    if (canvas && items.length > 0) {
+        const ctx = canvas.getContext("2d");
+        const width = canvas.width;
+        const height = canvas.height;
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const radius = width / 2;
+        const selectPattern = createStripesPattern();
+        let currentDeg = 0;
+        let step = 360 / items.length;
+
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+            const palette = ['#c54954', '#003468', '#97222d', '#6b96b8', '#e1253c', '#97a1a7'];
+            let startDeg = currentDeg;
+
+            for (let i = 0; i < items.length; i++) {
+                const endDeg = startDeg + step;
+                const color = palette[i % palette.length];
+
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, toRad(startDeg), toRad(endDeg));
+                ctx.closePath();
+
+                const gradient = ctx.createRadialGradient(centerX, centerY, 5, centerX, centerY, radius);
+                gradient.addColorStop(0, LightenDarkenColor(color, 60));
+                gradient.addColorStop(1, color);
+                ctx.fillStyle = gradient;
+                ctx.fill();
+
+                ctx.fillStyle = selectPattern;
+                ctx.fill();
+
+                const borderX = centerX + radius * Math.cos(toRad(startDeg));
+                const borderY = centerY + radius * Math.sin(toRad(startDeg));
+
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.lineTo(borderX, borderY);
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.lineTo(borderX, borderY);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(toRad((startDeg + endDeg) / 2));
+                ctx.textAlign = "left";
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = "#FFFFFF";
+                ctx.font = '400 16px Montserrat';
+                ctx.shadowColor = "rgba(0,0,0,0.5)";
+                ctx.shadowBlur = 4;
+
+                const words = items[i].split(' ');
+                let line = '';
+                const lines = [];
+                const maxWidth = radius * 0.60;
+                const lineHeight = 20;
+
+                for (let n = 0; n < words.length; n++) {
+                    const testLine = line + words[n] + ' ';
+                    const testWidth = ctx.measureText(testLine).width;
+                    if (testWidth > maxWidth && n > 0) {
+                        lines.push(line.trim());
+                        line = words[n] + ' ';
+                    } else {
+                        line = testLine;
+                    }
+                }
+                lines.push(line.trim());
+
+                const startY = 0 - ((lines.length - 1) * lineHeight) / 2;
+                for (let j = 0; j < lines.length; j++) {
+                    ctx.fillText(lines[j], radius * 0.25, startY + (j * lineHeight));
+                }
+                ctx.restore();
+
+                startDeg += step;
+            }
+        }
+
+        document.fonts.ready.then(draw);
+    } else {
+        const warning = document.getElementById('sin-segmentos');
+        if (warning) {
+            warning.classList.remove('d-none');
+        }
+    }
+</script>
+{% endblock %}
