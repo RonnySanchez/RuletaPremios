@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404, render, redirect
 from django.core.serializers import serialize
 from django.http import HttpResponse, HttpResponseNotFound, JsonResponse
 from django.urls import reverse
+from django.contrib.auth.decorators import login_required
 
 from cupones import models
 from cupones.models import Cupon
@@ -631,8 +632,8 @@ def vista_juego_regalos(request, encuesta_id, tienda_id, codigo_ticket):
 
 
 
+@login_required(login_url='/admin/login/')
 def simulador_pantallas(request):
-    # Solo administradores o personal autorizado debería ver esto (opcional pero recomendado)
     if not request.user.is_staff:
         return redirect('index')
 
@@ -666,6 +667,7 @@ def simulador_pantallas(request):
     return render(request, 'simulador_form.html', {'premios': premios})
 
 
+@login_required(login_url='/admin/login/')
 def simulador_ruleta_tienda(request):
     if not request.user.is_staff:
         return redirect('index')
