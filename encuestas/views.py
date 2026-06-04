@@ -50,7 +50,7 @@ def _build_ruleta_simulador_data(tienda, monto, fecha_referencia):
 
     for tp in premios_qs:
         stock = _stock_simulado(tp, monto, fecha_referencia)
-        visible_en_ruleta = stock > 0 or not tp.premio.es_premio
+        visible_en_ruleta = tp.visible
 
         detalle = {
             'id': tp.premio.id,
