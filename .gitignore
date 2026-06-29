@@ -46,4 +46,4 @@ loggerx/
 
 # EXCEPCIÓN: ¡No ignorar los archivos __init__.py!
 !**/migrations/__init__.py
-!encuestas/migrations/*.py
+!encuestas/migrations/0003_temaruleta_encuestafija_tema_ruleta.py
