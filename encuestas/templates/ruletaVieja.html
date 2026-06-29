@@ -69,18 +69,6 @@ body {
     position: relative;
 }
 
-.triangle {
-    width: 0; 
-    height: 0; 
-    border-top: 10px solid transparent;
-    border-bottom: 10px solid transparent; 
-    border-right: 30px solid rgba(250, 0, 0, 0.945); 
-    position: absolute;
-    top: 50%;
-    right: 0;
-    transform: translateY(-50%);
-}
-
 textarea {
     background-color: rgba(20, 20, 20, 0.2);
     caret-color: #fff;
@@ -151,7 +139,6 @@ textarea {
                         <div class="wheel">
                             <div class="ruleta">
                                 <canvas class="ruleta" id="canvas" width="500" height="500"></canvas>
-                                <div class="triangle"></div>
                             </div>
                             <div class="center-circle" onclick="spin()">
                                 <img src="{% static 'img/LogoLetrasEF.png' %}" alt="Logo" class="center-image logo">

@@ -5,131 +5,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100..900&display=swap" rel="stylesheet">
-
-<style>
-    body {
-        background-color: #003468 !important;
-        background-repeat: repeat;
-        font-family: "Montserrat", sans-serif !important;
-        color: #eeeeee !important;
-    }
-
-    .card {
-        background-color: rgba(0, 0, 0, 0) !important;
-    }
-
-    .card-borde-personalizado,
-    .card-borde-personalizado .card-header,
-    .card-borde-personalizado .card-footer {
-        border-color: none ; 
-        border: 0px solid rgba(0, 0, 0, .125) !important;
-        background-color: rgba(0, 0, 0, 0) !important;
-    }
-
-    .titulo-ruleta {
-        font-size: 20px;
-        font-weight: 600;
-    }
-
-    .modal-content {
-        background-color: rgba(0, 0, 0, 0.6) !important;
-    }
-
-    .ruleta-frame {
-        position: relative; 
-        width: 100%;
-        max-width: 550px; 
-        aspect-ratio: 1 / 1; 
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0 auto;
-        filter: drop-shadow(0px 10px 15px rgba(0, 0, 0, 0.3));        
-    }
-
-    .ruleta-frame::after {
-        content: ''; 
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-image: url("{% static 'images/Aro Ruleta 4.png' %}");
-        background-size: contain;
-        background-repeat: no-repeat;
-        z-index: 10; 
-        pointer-events: none; 
-    }
-
-    .wheel-container {
-        filter: none; 
-    }
-
-    .ruleta-wrapper { 
-        position: relative;
-    }
-
-    .triangle {
-        position: absolute;
-        top: 50%;
-        transform: translateY(-50%) rotate(45deg); 
-        z-index: 11;
-        width: 10%; 
-        height: 10%; 
-        right: -3%; 
-        background: linear-gradient(135deg,  #E1253C, #c54954, #97222D);
-        border-radius: 50% 50% 50% 0;
-        box-shadow: 
-            -2px 2px 5px rgba(0,0,0,0.4),
-            inset 1px -1px 2px rgba(0,0,0,0.3),
-            inset 2px 2px 4px rgba(255,255,255,0.6);
-    }
-
-    .ruleta, #canvas {
-        width: 100%; 
-        height: 100%;
-    }
-
-    .center-circle {
-        width: 20%;  
-        height: 20%; 
-        border-radius: 50%;
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-        background: radial-gradient(circle at 50% 35%, #FFFFFF, #979797 85%, #494949 100%);
-        box-shadow: 
-            inset 0px 5px 10px rgba(255, 255, 255, 0.5),
-            inset 0px -5px 15px rgba(0, 0, 0, 0.3),
-            0px 10px 20px rgba(0, 0, 0, 0.4); 
-        z-index: 11;
-    }
-
-    .center-circle:hover {
-        transform: translate(-50%, -50%) scale(1.05);
-    }
-
-    .center-circle:active {
-        transform: translate(-50%, -50%) scale(1.02);
-        box-shadow: 
-            inset 0px 3px 8px rgba(255, 255, 255, 0.5),
-            inset 0px -3px 10px rgba(0, 0, 0, 0.3),
-            0px 5px 10px rgba(0, 0, 0, 0.3);
-        transition-duration: 0.1s;
-    }
-    .center-image {
-        width: 60%;
-        filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.4));
-    }
-
-</style>
+<link rel="stylesheet" href="{% static 'css/ruleta.css' %}?v=20260629-ruleta-pointer-before-restore">
+{% include 'includes/ruleta_tema_vars.html' %}
 {% endblock  %}
+
+{% block body_class %}ruleta-theme ruleta-page{% endblock body_class %}
    
 {% block title %}
     Ruleta de la suerte
@@ -143,13 +23,13 @@
                 <img id="imagenModalResultado" src="{% static 'images/felicidades.png' %}" class="img-fluid mx-auto d-block" alt="...">
             </div>
             <div class="modal-body text-center">
-                <div id="contenedorImagenPremio" style="margin-bottom: 1.5rem; display: none;">
-                    <img id="fotoPremio" src="" class="img-fluid rounded" style="max-height: 150px; object-fit: contain;">
+                <div id="contenedorImagenPremio" class="premio-photo-container">
+                    <img id="fotoPremio" src="" class="img-fluid rounded premio-photo" alt="">
                 </div>
 
-                <p id="mensajePremio" style="color:#FFFFFF; font-size: 2rem; margin-bottom: 0.5rem;" class="fw-bold"></p> 
-                
-                <p id="descripcionPremio" style="color:#cccccc; font-size: 1.1rem; margin-bottom: 2rem;"></p>
+                <p id="mensajePremio" class="premio-modal-title fw-bold"></p>
+
+                <p id="descripcionPremio" class="premio-modal-description"></p>
 
                 <button type="button" class="btn btn-light btn-lg" onclick="finalizarSorteo()">Finalizar</button>
             </div>
@@ -165,7 +45,7 @@
             <div class="card card-borde-personalizado">
                 <div class="card-header border-0">
                     <img src="{% static 'images/gira y gana.png' %}" class="img-fluid mx-auto d-block" alt="...">
-                    <p id="winner" style="display: none;"></p>
+                    <p id="winner" class="d-none"></p>
                 </div>
                 <div class="card-body">
                     <br>
@@ -174,10 +54,11 @@
                             <div class="ruleta-wrapper">
                                 <canvas class="ruleta" id="canvas" width="480" height="480"></canvas>
                             </div>
-                            <div class="center-circle" onclick="spin()"> 
+                            <div class="center-circle" onclick="spin()">
                                 <img src="{% static 'img/LogoLetrasEF.png' %}" alt="Logo" class="center-image logo">
                             </div>
                         </div>
+                        <div class="ruleta-pointer"></div>
                     </div>
                 </div>
             </div>
@@ -213,6 +94,20 @@
     }
 
     const selectPattern = createStripesPattern();
+
+    function getCssColor(variableName, fallback) {
+        const value = getComputedStyle(document.body).getPropertyValue(variableName).trim();
+        return value || fallback;
+    }
+
+    const wheelPalette = [
+        getCssColor('--wheel-color-1', '#c54954'),
+        getCssColor('--wheel-color-2', '#003468'),
+        getCssColor('--wheel-color-3', '#97222d'),
+        getCssColor('--wheel-color-4', '#6b96b8'),
+        getCssColor('--wheel-color-5', '#e1253c'),
+        getCssColor('--wheel-color-6', '#97a1a7'),
+    ];
 
     // Simula fuegos artificiales (Confeti)
     function lanzarFuegosArtificiales() {
@@ -294,12 +189,11 @@
     function draw(){
         ctx.clearRect(0, 0, width, height);
 
-        const palette = ['#c54954', '#003468', '#97222d', '#6b96b8', '#e1253c', '#97a1a7'];
         let startDeg = currentDeg;
 
         for(let i = 0; i < items.length; i++){
             let endDeg = startDeg + step;
-            let color = palette[i % palette.length];
+            let color = wheelPalette[i % wheelPalette.length];
 
             // 1. Relleno y gradiente
             ctx.beginPath();

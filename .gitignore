@@ -16,6 +16,7 @@ __pycache__/
 
 # Backups y bases de datos
 *.sql
+*.sql.gz
 *.sqlite3
 
 # Django
@@ -27,6 +28,7 @@ staticfiles/
 # Entorno Virtual
 venv/
 env/
+.venv/
 .env
 .DS_Store
 
