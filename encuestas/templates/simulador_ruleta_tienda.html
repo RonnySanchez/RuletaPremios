@@ -7,17 +7,111 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100..900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'css/ruleta.css' %}?v=20260629-ruleta-pointer-before-restore">
-{% include 'includes/ruleta_tema_vars.html' %}
+<style>
+    body {
+        background-color: #003468 !important;
+        font-family: "Montserrat", sans-serif !important;
+        color: #eeeeee !important;
+    }
+    .card, .card-header, .card-body {
+        background-color: rgba(0, 0, 0, 0.18) !important;
+        border-color: rgba(255,255,255,0.12) !important;
+    }
+    .ruleta-frame {
+        position: relative;
+        width: 100%;
+        max-width: 550px;
+        aspect-ratio: 1 / 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto;
+        filter: drop-shadow(0px 10px 15px rgba(0, 0, 0, 0.3));
+    }
+    .ruleta-frame::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image: url("{% static 'images/Aro Ruleta 4.png' %}");
+        background-size: contain;
+        background-repeat: no-repeat;
+        z-index: 10;
+        pointer-events: none;
+    }
+    .ruleta-wrapper {
+        position: relative;
+    }
+    .triangle {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%) rotate(45deg);
+        z-index: 11;
+        width: 10%;
+        height: 10%;
+        right: -3%;
+        background: linear-gradient(135deg, #E1253C, #c54954, #97222D);
+        border-radius: 50% 50% 50% 0;
+        box-shadow: -2px 2px 5px rgba(0,0,0,0.4), inset 1px -1px 2px rgba(0,0,0,0.3), inset 2px 2px 4px rgba(255,255,255,0.6);
+    }
+    .ruleta, #canvas {
+        width: 100%;
+        height: 100%;
+    }
+    .center-circle {
+        width: 20%;
+        height: 20%;
+        border-radius: 50%;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(circle at 50% 35%, #FFFFFF, #979797 85%, #494949 100%);
+        box-shadow: inset 0px 5px 10px rgba(255, 255, 255, 0.5), inset 0px -5px 15px rgba(0, 0, 0, 0.3), 0px 10px 20px rgba(0, 0, 0, 0.4);
+        z-index: 11;
+    }
+    .center-image {
+        width: 60%;
+        filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.4));
+    }
+    .badge-soft {
+        background-color: rgba(255,255,255,0.14);
+        color: #fff;
+    }
+    .table-dark {
+        --bs-table-bg: rgba(0,0,0,0.18);
+        --bs-table-striped-bg: rgba(255,255,255,0.04);
+        --bs-table-hover-bg: rgba(255,255,255,0.06);
+    }
+    .sim-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .sim-meta .badge {
+        font-size: 0.95rem;
+        padding: 0.6rem 0.8rem;
+    }
+    .table-sm th, .table-sm td {
+        padding: 0.55rem 0.65rem;
+        vertical-align: middle;
+    }
+    .table th {
+        white-space: nowrap;
+    }
+    .premio-col {
+        min-width: 220px;
+    }
+</style>
 {% endblock %}
-
-{% block body_class %}ruleta-theme simulador-page{% endblock body_class %}
 
 {% block content %}
 <div class="container py-4">
     <div class="row g-4">
         <div class="col-12">
-            <div class="card simulador-panel-card">
+            <div class="card">
                 <div class="card-header">
                     <h4 class="mb-0">Simulador realista de ruleta por tienda</h4>
                 </div>
@@ -62,7 +156,7 @@
 
         {% if tienda %}
         <div class="col-12">
-            <div class="card simulador-ruleta-card">
+            <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span>Vista de ruleta</span>
                     <span class="badge badge-soft">{{ tienda.nombre }}</span>
@@ -83,11 +177,11 @@
                     <div class="ruleta-frame">
                         <div class="ruleta-wrapper w-100">
                             <canvas class="ruleta" id="canvas" width="480" height="480"></canvas>
+                            <div class="triangle"></div>
                             <div class="center-circle">
                                 <img src="{% static 'img/LogoLetrasEF.png' %}" alt="Logo" class="center-image">
                             </div>
                         </div>
-                        <div class="ruleta-pointer"></div>
                     </div>
                     {% endif %}
                 </div>
@@ -95,7 +189,7 @@
         </div>
 
         <div class="col-12">
-            <div class="card simulador-panel-card">
+            <div class="card">
                 <div class="card-header">Detalle de premios visibles de la tienda</div>
                 <div class="card-body table-responsive">
                     <table class="table table-dark table-striped table-sm align-middle mb-0">
@@ -161,20 +255,11 @@
 {% block js_footer %}
 <script id="premios-data" type="application/json">{{ premiosDat|safe }}</script>
 <script id="encuestas-tiendas-data" type="application/json">{{ encuestas_tiendas_map|safe }}</script>
-<script id="encuestas-themes-data" type="application/json">{{ encuestas_theme_map|safe }}</script>
 <script>
     const encuestaSelect = document.getElementById('encuesta_id');
     const tiendaSelect = document.getElementById('tienda_id');
     const encuestasTiendasMap = JSON.parse(document.getElementById('encuestas-tiendas-data').textContent);
-    const encuestasThemeMap = JSON.parse(document.getElementById('encuestas-themes-data').textContent);
     const tiendaSeleccionada = "{{ tienda_id_seleccionada|default_if_none:'' }}";
-
-    function applyTheme(encuestaId) {
-        const themeVars = encuestasThemeMap[String(encuestaId)] || encuestasThemeMap.__default__ || {};
-        Object.entries(themeVars).forEach(function([cssVar, cssValue]) {
-            document.body.style.setProperty(cssVar, cssValue);
-        });
-    }
 
     function renderTiendas(encuestaId, tiendaIdActual = '') {
         if (!tiendaSelect) {
@@ -210,11 +295,9 @@
 
     if (encuestaSelect) {
         renderTiendas(encuestaSelect.value, tiendaSeleccionada);
-        applyTheme(encuestaSelect.value);
 
         encuestaSelect.addEventListener('change', function() {
             renderTiendas(this.value, '');
-            applyTheme(this.value);
         });
     }
 
@@ -233,11 +316,6 @@
     }
 
     function toRad(deg) { return deg * (Math.PI / 180.0); }
-
-    function getCssColor(variableName, fallback) {
-        const value = getComputedStyle(document.body).getPropertyValue(variableName).trim();
-        return value || fallback;
-    }
 
     function LightenDarkenColor(col, amt) {
         let usePound = false;
@@ -266,22 +344,15 @@
         const selectPattern = createStripesPattern();
         let currentDeg = 0;
         let step = 360 / items.length;
-        const wheelPalette = [
-            getCssColor('--wheel-color-1', '#c54954'),
-            getCssColor('--wheel-color-2', '#003468'),
-            getCssColor('--wheel-color-3', '#97222d'),
-            getCssColor('--wheel-color-4', '#6b96b8'),
-            getCssColor('--wheel-color-5', '#e1253c'),
-            getCssColor('--wheel-color-6', '#97a1a7'),
-        ];
 
         function draw() {
             ctx.clearRect(0, 0, width, height);
+            const palette = ['#c54954', '#003468', '#97222d', '#6b96b8', '#e1253c', '#97a1a7'];
             let startDeg = currentDeg;
 
             for (let i = 0; i < items.length; i++) {
                 const endDeg = startDeg + step;
-                const color = wheelPalette[i % wheelPalette.length];
+                const color = palette[i % palette.length];
 
                 ctx.beginPath();
                 ctx.moveTo(centerX, centerY);

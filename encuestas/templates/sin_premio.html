@@ -9,11 +9,20 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100..900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'css/ruleta.css' %}?v=20260629-ruleta-pointer-before-restore">
-{% include 'includes/ruleta_tema_vars.html' %}
-{% endblock %}
 
-{% block body_class %}ruleta-theme sin-premio-page{% endblock body_class %}
+<style>
+    body {
+        background-color: #003468 !important;
+        background-repeat: repeat;
+        font-family: "Montserrat", sans-serif !important;
+        color: #eeeeee !important;
+    }
+    .card-borde-personalizado {
+        border: 0px solid rgba(0, 0, 0, .125) !important;
+        background-color: rgba(0, 0, 0, 0) !important;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="container">

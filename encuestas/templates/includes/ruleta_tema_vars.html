@@ -1,9 +1,0 @@
-{% if ruleta_theme_vars %}
-<style>
-body.ruleta-theme {
-{% for css_var, css_value in ruleta_theme_vars.items %}
-    {{ css_var }}: {{ css_value }};
-{% endfor %}
-}
-</style>
-{% endif %}

@@ -1,132 +1,11 @@
-import json
-
 from django.contrib import admin
-from django import forms
 from django.utils.html import format_html, mark_safe
 from django.urls import reverse
-from .models import Encuesta, TicketConsulta, Pregunta, Opcion, PreguntaOpcion, EncuestaPregunta, Respuesta, TicketVentasEnLinea, Tienda, Pais, Region, Premio, Tienda, TiendaPremio, FormularioEncFija, TemaRuleta, EncuestaFija, EncuestaFijaRespuesta, EncuestaFijaPremio
+from .models import Encuesta, TicketConsulta, Pregunta, Opcion, PreguntaOpcion, EncuestaPregunta, Respuesta, TicketVentasEnLinea, Tienda, Pais, Region, Premio, Tienda, TiendaPremio, FormularioEncFija, EncuestaFija, EncuestaFijaRespuesta, EncuestaFijaPremio
 from import_export import resources, fields
 from import_export.widgets import ForeignKeyWidget
 from import_export.admin import ImportExportModelAdmin
 
-
-TEMA_RULETA_COLOR_FIELDS = (
-    'fondo_ruleta',
-    'fondo_premio',
-    'fondo_sin_premio',
-    'texto_principal',
-    'texto_secundario',
-    'segmento_1',
-    'segmento_2',
-    'segmento_3',
-    'segmento_4',
-    'segmento_5',
-    'segmento_6',
-    'puntero_inicio',
-    'puntero_medio',
-    'puntero_fin',
-)
-
-
-class ColorPickerTextWidget(forms.TextInput):
-    PRESET_COLORS = [
-        '#003468', '#c54954', '#97222d', '#6b96b8',
-        '#0d47a1', '#0a367a', '#1e88e5', '#1565c0',
-        '#6c757d', '#198754', '#ffc107', '#dc3545',
-        '#f4f6f9', '#ffffff', '#eeeeee', '#c9c9c9',
-        '#333333', '#111827',
-    ]
-
-    def __init__(self, attrs=None, preset_colors=None):
-        widget_attrs = {
-            'class': 'ruleta-color-source',
-            'pattern': r'^#[0-9A-Fa-f]{6}$',
-            'placeholder': '#003468',
-            'data-preset-colors': json.dumps(preset_colors or self.PRESET_COLORS),
-        }
-        if attrs:
-            widget_attrs.update(attrs)
-        super().__init__(attrs=widget_attrs)
-
-
-class TemaRuletaAdminForm(forms.ModelForm):
-    class Meta:
-        model = TemaRuleta
-        fields = '__all__'
-        widgets = {
-            field: ColorPickerTextWidget()
-            for field in TEMA_RULETA_COLOR_FIELDS
-        }
-
-
-@admin.register(TemaRuleta)
-class TemaRuletaAdmin(admin.ModelAdmin):
-    form = TemaRuletaAdminForm
-    list_display = (
-        'nombre',
-        'activo',
-        'muestra_fondo_ruleta',
-        'muestra_fondo_premio',
-        'muestra_fondo_sin_premio',
-    )
-    list_filter = ('activo',)
-    search_fields = ('nombre',)
-    fieldsets = (
-        (None, {
-            'fields': ('nombre', 'activo')
-        }),
-        ('Fondos y textos', {
-            'fields': (
-                'fondo_ruleta',
-                'fondo_premio',
-                'fondo_sin_premio',
-                'texto_principal',
-                'texto_secundario',
-            )
-        }),
-        ('Colores de la ruleta', {
-            'fields': (
-                'segmento_1',
-                'segmento_2',
-                'segmento_3',
-                'segmento_4',
-                'segmento_5',
-                'segmento_6',
-            )
-        }),
-        ('Puntero', {
-            'fields': (
-                'puntero_inicio',
-                'puntero_medio',
-                'puntero_fin',
-            )
-        }),
-    )
-
-    def _color_preview(self, value):
-        return format_html(
-            '<span style="display:inline-block;width:18px;height:18px;border:1px solid #bbb;background:{};vertical-align:middle;margin-right:6px;"></span>{}',
-            value,
-            value
-        )
-
-    def muestra_fondo_ruleta(self, obj):
-        return self._color_preview(obj.fondo_ruleta)
-    muestra_fondo_ruleta.short_description = 'Fondo ruleta'
-
-    def muestra_fondo_premio(self, obj):
-        return self._color_preview(obj.fondo_premio)
-    muestra_fondo_premio.short_description = 'Fondo premio'
-
-    def muestra_fondo_sin_premio(self, obj):
-        return self._color_preview(obj.fondo_sin_premio)
-    muestra_fondo_sin_premio.short_description = 'Fondo sin premio'
-
-    class Media:
-        css = {
-            'all': ('encuestas/admin/tema_ruleta_color_picker.css',)
-        }
-        js = ('encuestas/admin/tema_ruleta_color_picker.js',)
 
 
 
@@ -397,9 +276,9 @@ class FormularioEncFijaAdmin(admin.ModelAdmin):
 
 @admin.register(EncuestaFija)
 class EncuestaFijaAdmin(admin.ModelAdmin):
-    list_display = ('titulo', 'descripcion', 'activa', 'tipo_juego', 'tema_ruleta')
+    list_display = ('titulo', 'descripcion', 'activa', 'tipo_juego', )
     search_fields = ('titulo',)
-    list_filter = ('activa', 'tipo_juego', 'tema_ruleta')
+    list_filter = ('activa',)
     readonly_fields = ['tiendas_asignadas_enlaces_fijas',]
     filter_horizontal = ('tiendas',)
     def tiendas_asignadas_enlaces_fijas(self, obj):
