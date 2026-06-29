@@ -16,6 +16,7 @@ __pycache__/
 
 # Backups y bases de datos
 *.sql
+*.sql.gz
 *.sqlite3
 
 # Django
@@ -27,6 +28,7 @@ staticfiles/
 # Entorno Virtual
 venv/
 env/
+.venv/
 .env
 .DS_Store
 
@@ -44,3 +46,4 @@ loggerx/
 
 # EXCEPCIÓN: ¡No ignorar los archivos __init__.py!
 !**/migrations/__init__.py
+!encuestas/migrations/0003_temaruleta_encuestafija_tema_ruleta.py

@@ -7,7 +7,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100..900&display=swap" rel="stylesheet">
 
-<style>
+<link rel="stylesheet" href="{% static 'css/ruleta.css' %}?v=20260629-ruleta-pointer-before-restore">
+{% include 'includes/ruleta_tema_vars.html' %}
+{% comment %}
     body {
         background-color: #003468 !important;
        /* background-image: url("{% static 'img/fondoruleta.png' %}");*/
@@ -66,10 +68,12 @@
     }
     
     
-</style>
+{% endcomment %}
 
 
 {% endblock %}
+
+{% block body_class %}ruleta-theme premio-page{% endblock body_class %}
 
 
 {% block title %}

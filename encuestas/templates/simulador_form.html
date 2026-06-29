@@ -3,30 +3,49 @@
 
 {% block title %}Simulador de Pantallas Finales{% endblock title %}
 
+{% block header %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100..900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/ruleta.css' %}?v=20260629-ruleta-pointer-before-restore">
+{% include 'includes/ruleta_tema_vars.html' %}
+{% endblock %}
+
+{% block body_class %}ruleta-theme simulador-page{% endblock body_class %}
+
 {% block content %}
-<div class="container mt-5 text-white">
+<div class="container py-5">
     <div class="row justify-content-center">
         <div class="col-md-6">
-            <div class="card bg-dark border-light">
-                <div class="card-header bg-primary text-center">
-                    <h4>🛠️ Simulador de Resultados de Ruleta</h4>
+            <div class="card">
+                <div class="card-header text-center">
+                    <h4 class="mb-0">Simulador de Resultados de Ruleta</h4>
                 </div>
                 <div class="card-body">
-                    <p>Selecciona un premio de la base de datos para ver cómo le aparecerá a un cliente en la pantalla final de la tienda.</p>
-                    
+                    <p>Selecciona una campana y un premio para ver la pantalla final con sus colores configurados.</p>
+
                     <form method="POST" action="{% url 'simulador_pantallas' %}">
                         {% csrf_token %}
                         <div class="mb-3">
-                            <label for="premio_id" class="form-label">Selecciona el Premio / Resultado:</label>
+                            <label for="encuesta_id" class="form-label">Encuesta fija / Campana:</label>
+                            <select class="form-select" name="encuesta_id" id="encuesta_id" required>
+                                <option value="">-- Elige una campana --</option>
+                                {% for encuesta in encuestas %}
+                                    <option value="{{ encuesta.id }}">{{ encuesta.titulo }}{% if encuesta.tema_ruleta %} - {{ encuesta.tema_ruleta.nombre }}{% endif %}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="premio_id" class="form-label">Premio / Resultado:</label>
                             <select class="form-select" name="premio_id" id="premio_id" required>
-                                <option value="">-- Elige una opción --</option>
-                                {% for p in premios %}
-                                    <option value="{{ p.id }}">{{ p.nombre }} {% if not p.es_premio %} (Sin Premio) {% endif %}</option>
+                                <option value="">-- Elige una opcion --</option>
+                                {% for premio in premios %}
+                                    <option value="{{ premio.id }}">{{ premio.nombre }}{% if not premio.es_premio %} (Sin Premio){% endif %}</option>
                                 {% endfor %}
                             </select>
                         </div>
                         <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-success">Simular Pantalla</button>
+                            <button type="submit" class="btn btn-light">Simular Pantalla</button>
                         </div>
                     </form>
                 </div>

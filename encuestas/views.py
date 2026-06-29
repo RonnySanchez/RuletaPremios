@@ -10,7 +10,7 @@ from django.contrib.auth.decorators import login_required
 
 from cupones import models
 from cupones.models import Cupon
-from .models import Tienda, TicketConsulta, Encuesta, EncuestaPregunta, Respuesta, Opcion, TiendaPremio, EncuestaFija, EncuestaFijaRespuesta, EncuestaFijaPremio, Premio, TicketVentasEnLinea, transaction
+from .models import Tienda, TicketConsulta, Encuesta, EncuestaPregunta, Respuesta, Opcion, TiendaPremio, TemaRuleta, EncuestaFija, EncuestaFijaRespuesta, EncuestaFijaPremio, Premio, TicketVentasEnLinea, transaction
 from .forms import EncuestaForm, EncuestaFijaForm, TicketForm
 from django.utils.html import format_html
 from django.db.models import F
@@ -31,6 +31,12 @@ def _parse_date(value):
         return datetime.strptime(value, '%Y-%m-%d').date()
     except ValueError:
         return timezone.now().date()
+
+
+def _ruleta_theme_vars(encuesta_fija=None):
+    if encuesta_fija:
+        return encuesta_fija.obtener_tema_ruleta_vars()
+    return TemaRuleta.default_css_variables()
 
 
 def _stock_simulado(tienda_premio, monto, fecha_referencia):
@@ -328,6 +334,7 @@ def ruleta(request, encuesta_id, tienda_id, codigo_ticket):
         'premiosDat': premios_json,
         'respuestas': respuestas,
         'tipojuego': encuesta_fija.tipo_juego,
+        'ruleta_theme_vars': _ruleta_theme_vars(encuesta_fija),
     }
     
     # 6. Redirección al Template correspondiente
@@ -556,6 +563,7 @@ def guardar_premio(request):
     # 'entregado' es la instancia de EncuestaFijaPremio
     context = {
         'premio': entregado,
+        'ruleta_theme_vars': _ruleta_theme_vars(entregado.encuesta_fija),
     }
     
     if entregado.premio.es_premio: 
@@ -637,8 +645,15 @@ def simulador_pantallas(request):
     if not request.user.is_staff:
         return redirect('index')
 
+    encuestas = EncuestaFija.objects.filter(activa=True).select_related('tema_ruleta').order_by('titulo')
+
     if request.method == 'POST':
         premio_id = request.POST.get('premio_id')
+        encuesta_id = request.POST.get('encuesta_id')
+
+        encuesta_fija = None
+        if encuesta_id and str(encuesta_id).isdigit():
+            encuesta_fija = encuestas.filter(id=encuesta_id).first()
         
         # Traemos el premio real de la base de datos
         premio_real = Premio.objects.get(id=premio_id)
@@ -653,8 +668,12 @@ def simulador_pantallas(request):
         entregado_falso.DNI = "12345678"
         entregado_falso.codigo_ticket = "SIMULADOR-999"
         entregado_falso.premio = premio_real
+        entregado_falso.encuesta_fija = encuesta_fija
         
-        context = {'premio': entregado_falso}
+        context = {
+            'premio': entregado_falso,
+            'ruleta_theme_vars': _ruleta_theme_vars(encuesta_fija),
+        }
         
         # Usamos tu misma lógica de desvío
         if premio_real.es_premio:
@@ -664,7 +683,11 @@ def simulador_pantallas(request):
 
     # Si entran por GET, mostramos el selector de premios
     premios = Premio.objects.all()
-    return render(request, 'simulador_form.html', {'premios': premios})
+    return render(request, 'simulador_form.html', {
+        'premios': premios,
+        'encuestas': encuestas,
+        'ruleta_theme_vars': _ruleta_theme_vars(),
+    })
 
 
 @login_required(login_url='/admin/login/')
@@ -672,8 +695,11 @@ def simulador_ruleta_tienda(request):
     if not request.user.is_staff:
         return redirect('index')
 
-    encuestas = EncuestaFija.objects.filter(activa=True).order_by('titulo')
+    encuestas = EncuestaFija.objects.filter(activa=True).select_related('tema_ruleta').order_by('titulo')
     encuestas_tiendas_map = {}
+    encuestas_theme_map = {
+        '__default__': TemaRuleta.default_css_variables(),
+    }
 
     for item in encuestas:
         encuestas_tiendas_map[str(item.id)] = [
@@ -683,6 +709,7 @@ def simulador_ruleta_tienda(request):
             }
             for tienda in item.get_tiendas_asignadas().filter(activa=True).order_by('nombre')
         ]
+        encuestas_theme_map[str(item.id)] = item.obtener_tema_ruleta_vars()
 
     encuesta = None
     tiendas = Tienda.objects.none()
@@ -696,7 +723,7 @@ def simulador_ruleta_tienda(request):
     tienda_id = request.GET.get('tienda_id')
 
     if encuesta_id and str(encuesta_id).isdigit():
-        encuesta = EncuestaFija.objects.filter(id=encuesta_id, activa=True).first()
+        encuesta = encuestas.filter(id=encuesta_id).first()
         if encuesta:
             tiendas = encuesta.get_tiendas_asignadas().filter(activa=True).order_by('nombre')
 
@@ -715,6 +742,7 @@ def simulador_ruleta_tienda(request):
         'encuesta': encuesta,
         'tiendas': tiendas,
         'encuestas_tiendas_map': json.dumps(encuestas_tiendas_map),
+        'encuestas_theme_map': json.dumps(encuestas_theme_map),
         'tienda': tienda,
         'premiosDat': premios_json,
         'detalle_premios': detalle_premios,
@@ -723,6 +751,7 @@ def simulador_ruleta_tienda(request):
         'fecha_referencia': fecha_referencia,
         'encuesta_id_seleccionada': int(encuesta_id) if encuesta_id and str(encuesta_id).isdigit() else None,
         'tienda_id_seleccionada': int(tienda_id) if tienda_id and str(tienda_id).isdigit() else None,
+        'ruleta_theme_vars': _ruleta_theme_vars(encuesta),
     }
     return render(request, 'simulador_ruleta_tienda.html', context)
 

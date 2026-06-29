@@ -5,6 +5,7 @@ from django.urls import reverse
 from decimal import Decimal
 from django.db import models, transaction
 from django.core.exceptions import ValidationError
+from django.core.validators import RegexValidator
 from django.utils.html import format_html
 
 
@@ -364,6 +365,91 @@ class FormularioEncFija(models.Model):
     def __str__(self):
         return self.nombre
 
+
+hex_color_validator = RegexValidator(
+    regex=r'^#[0-9A-Fa-f]{6}$',
+    message='Ingrese un color hexadecimal valido, por ejemplo #003468.'
+)
+
+
+def color_field(verbose_name, default):
+    return models.CharField(
+        verbose_name,
+        max_length=7,
+        default=default,
+        validators=[hex_color_validator],
+        help_text='Formato #RRGGBB'
+    )
+
+
+class TemaRuleta(models.Model):
+    nombre = models.CharField(max_length=100, unique=True)
+    fondo_ruleta = color_field("Fondo de ruleta", "#003468")
+    fondo_premio = color_field("Fondo con premio", "#003468")
+    fondo_sin_premio = color_field("Fondo sin premio", "#003468")
+    texto_principal = color_field("Texto principal", "#eeeeee")
+    texto_secundario = color_field("Texto secundario", "#c9c9c9")
+    segmento_1 = color_field("Segmento 1", "#c54954")
+    segmento_2 = color_field("Segmento 2", "#003468")
+    segmento_3 = color_field("Segmento 3", "#97222d")
+    segmento_4 = color_field("Segmento 4", "#6b96b8")
+    segmento_5 = color_field("Segmento 5", "#e1253c")
+    segmento_6 = color_field("Segmento 6", "#97a1a7")
+    puntero_inicio = color_field("Puntero inicio", "#e1253c")
+    puntero_medio = color_field("Puntero medio", "#c54954")
+    puntero_fin = color_field("Puntero fin", "#97222d")
+    activo = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = "Tema de Ruleta"
+        verbose_name_plural = "Temas de Ruleta"
+        ordering = ['nombre']
+
+    def __str__(self):
+        return self.nombre
+
+    @classmethod
+    def default_css_variables(cls):
+        return {
+            '--ruleta-bg-color': '#003468',
+            '--premio-bg-color': '#003468',
+            '--sin-premio-bg-color': '#003468',
+            '--simulador-bg-color': '#003468',
+            '--ef-text': '#eeeeee',
+            '--ef-muted-text': '#c9c9c9',
+            '--wheel-color-1': '#c54954',
+            '--wheel-color-2': '#003468',
+            '--wheel-color-3': '#97222d',
+            '--wheel-color-4': '#6b96b8',
+            '--wheel-color-5': '#e1253c',
+            '--wheel-color-6': '#97a1a7',
+            '--pointer-color-1': '#e1253c',
+            '--pointer-color-2': '#c54954',
+            '--pointer-color-3': '#97222d',
+        }
+
+    def css_variables(self):
+        variables = self.default_css_variables()
+        variables.update({
+            '--ruleta-bg-color': self.fondo_ruleta,
+            '--premio-bg-color': self.fondo_premio,
+            '--sin-premio-bg-color': self.fondo_sin_premio,
+            '--simulador-bg-color': self.fondo_ruleta,
+            '--ef-text': self.texto_principal,
+            '--ef-muted-text': self.texto_secundario,
+            '--wheel-color-1': self.segmento_1,
+            '--wheel-color-2': self.segmento_2,
+            '--wheel-color-3': self.segmento_3,
+            '--wheel-color-4': self.segmento_4,
+            '--wheel-color-5': self.segmento_5,
+            '--wheel-color-6': self.segmento_6,
+            '--pointer-color-1': self.puntero_inicio,
+            '--pointer-color-2': self.puntero_medio,
+            '--pointer-color-3': self.puntero_fin,
+        })
+        return variables
+
+
 class EncuestaFija(models.Model):
     class TipoJuego(models.TextChoices):
         RULETA = 'RULETA', 'Ruleta de Premios'
@@ -379,6 +465,15 @@ class EncuestaFija(models.Model):
         default=TipoJuego.RULETA, # Se asignará 'Ruleta' por defecto
         verbose_name="Tipo de Juego Post-Encuesta"
     )
+    tema_ruleta = models.ForeignKey(
+        TemaRuleta,
+        on_delete=models.SET_NULL,
+        related_name='encuestas_fijas',
+        null=True,
+        blank=True,
+        verbose_name="Tema visual de ruleta",
+        help_text="Define los colores usados por la ruleta y sus pantallas de resultado."
+    )
     tiendas = models.ManyToManyField(Tienda, related_name='encuestasfijas', blank=True)
     region = models.ForeignKey(Region, on_delete=models.CASCADE, related_name='encuestasfijas', null=True, blank=True)
     pais = models.ForeignKey(Pais, on_delete=models.CASCADE, related_name='encuestasfijas', null=True, blank=True)
@@ -389,6 +484,11 @@ class EncuestaFija(models.Model):
     
     def __str__(self):
         return self.titulo
+
+    def obtener_tema_ruleta_vars(self):
+        if self.tema_ruleta_id and self.tema_ruleta:
+            return self.tema_ruleta.css_variables()
+        return TemaRuleta.default_css_variables()
     
     class Meta:
         verbose_name = "Encuesta Fija"
