@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100..900&display=swap" rel="stylesheet">
 
-<link rel="stylesheet" href="{% static 'css/ruleta.css' %}?v=20260629-ruleta-pointer-before-restore">
+<link rel="stylesheet" href="{% static 'css/ruleta.css' %}?v=20260701-ruleta-theme-images">
 {% include 'includes/ruleta_tema_vars.html' %}
 {% comment %}
     body {
@@ -94,7 +94,7 @@ Premio entregado
             <div class="card card-borde-personalizado">
                 <form method="POST">
                     <div class="card-header">
-                        <img src="{% static 'images/felicidades1.png' %}" class="img-fluid mx-auto d-block" alt="...">
+                        <div class="premio-header-banner" aria-label="Felicidades"></div>
                     </div>
                     <div class="card-body text-center">
                         {% if premio.premio.imagen %}

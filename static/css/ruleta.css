@@ -16,6 +16,11 @@
     --premio-bg-color: var(--ef-blue);
     --sin-premio-bg-color: var(--ef-blue);
     --simulador-bg-color: var(--ef-blue);
+    --ruleta-header-image-default: url("../images/gira y gana.png");
+    --premio-header-image-default: url("../images/felicidades1.png");
+    --ruleta-header-image: var(--ruleta-header-image-default);
+    --premio-header-image: var(--premio-header-image-default);
+    --ruleta-bg-image: none;
     --wheel-color-1: var(--ef-red-muted);
     --wheel-color-2: var(--ef-blue);
     --wheel-color-3: var(--ef-red-dark);
@@ -29,9 +34,18 @@
 
 body.ruleta-theme {
     background-color: var(--ruleta-bg-color);
-    background-repeat: repeat;
+    background-repeat: no-repeat;
     color: var(--ef-text);
     font-family: "Montserrat", sans-serif;
+    min-height: 100vh;
+}
+
+body.ruleta-page,
+body.simulador-page {
+    background-image: var(--ruleta-bg-image);
+    background-position: center top;
+    background-size: cover;
+    background-attachment: fixed;
 }
 
 body.premio-page {
@@ -59,6 +73,16 @@ body.simulador-page {
 .premio-page .card,
 .sin-premio-page .card {
     background-color: var(--ef-card-clear);
+}
+
+.ruleta-theme .card,
+.ruleta-theme .card > .card-header,
+.ruleta-theme .card > .card-body,
+.ruleta-theme .card > .card-footer {
+    background: transparent !important;
+    background-color: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
 }
 
 .titulo-ruleta {
@@ -96,6 +120,41 @@ body.simulador-page {
     caret-color: #fff;
     resize: none;
     color: #fff;
+}
+
+.ruleta-header-banner,
+.premio-header-banner {
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: contain;
+    display: block;
+    height: 96px;
+    margin: 0 auto;
+    max-width: 420px;
+    width: 100%;
+}
+
+.ruleta-header-banner {
+    background-image: var(--ruleta-header-image);
+}
+
+.premio-header-banner {
+    background-image: var(--premio-header-image);
+}
+
+.simulador-copy-preview {
+    color: var(--ef-text);
+    margin: 1.5rem auto 0;
+    max-width: 520px;
+    text-align: center;
+}
+
+.simulador-copy-preview p {
+    margin-bottom: 0.35rem;
+}
+
+.simulador-copy-preview .simulador-copy-muted {
+    color: var(--ef-muted-text);
 }
 
 .imagen-premio {
@@ -239,30 +298,30 @@ body.simulador-page {
 }
 
 .simulador-page .card {
-    --bs-card-bg: var(--simulador-bg-color);
-    --bs-card-cap-bg: var(--simulador-bg-color);
-    --bs-card-border-color: var(--simulador-bg-color);
-    background: var(--simulador-bg-color) !important;
-    background-color: var(--simulador-bg-color) !important;
-    border-color: var(--simulador-bg-color) !important;
+    --bs-card-bg: transparent;
+    --bs-card-cap-bg: transparent;
+    --bs-card-border-color: transparent;
+    background: transparent !important;
+    background-color: transparent !important;
+    border-color: transparent !important;
     color: var(--ef-text);
 }
 
 .simulador-page .card > .card-header,
 .simulador-page .card > .card-body {
-    background: var(--simulador-bg-color) !important;
-    background-color: var(--simulador-bg-color) !important;
-    border-color: var(--simulador-bg-color) !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    border-color: transparent !important;
 }
 
 .simulador-page .simulador-ruleta-card {
     --ef-card-soft: var(--simulador-bg-color);
     --ef-border-soft: transparent;
-    --bs-card-bg: var(--simulador-bg-color);
-    --bs-card-cap-bg: var(--simulador-bg-color);
+    --bs-card-bg: transparent;
+    --bs-card-cap-bg: transparent;
     --bs-card-border-color: transparent;
-    background: var(--simulador-bg-color) !important;
-    background-color: var(--simulador-bg-color) !important;
+    background: transparent !important;
+    background-color: transparent !important;
     border-color: transparent !important;
     box-shadow: none !important;
 }
@@ -270,8 +329,8 @@ body.simulador-page {
 .simulador-page .simulador-ruleta-card,
 .simulador-page .simulador-ruleta-card .card-header,
 .simulador-page .simulador-ruleta-card .card-body {
-    background: var(--simulador-bg-color) !important;
-    background-color: var(--simulador-bg-color) !important;
+    background: transparent !important;
+    background-color: transparent !important;
     border-color: transparent !important;
 }
 
@@ -313,4 +372,12 @@ body.simulador-page {
 
 .premio-col {
     min-width: 220px;
+}
+
+@media (max-width: 576px) {
+    .ruleta-header-banner,
+    .premio-header-banner {
+        height: 72px;
+        max-width: 320px;
+    }
 }

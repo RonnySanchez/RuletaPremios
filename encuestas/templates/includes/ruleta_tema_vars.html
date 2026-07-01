@@ -2,7 +2,7 @@
 <style>
 body.ruleta-theme {
 {% for css_var, css_value in ruleta_theme_vars.items %}
-    {{ css_var }}: {{ css_value }};
+    {{ css_var }}: {{ css_value|safe }};
 {% endfor %}
 }
 </style>

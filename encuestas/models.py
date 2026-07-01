@@ -1,5 +1,6 @@
 import random
 from datetime import date
+from django.conf import settings
 from django.utils import timezone
 from django.urls import reverse
 from decimal import Decimal
@@ -7,6 +8,7 @@ from django.db import models, transaction
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.utils.html import format_html
+from django.utils.text import slugify
 
 
 class Pais(models.Model):
@@ -382,6 +384,11 @@ def color_field(verbose_name, default):
     )
 
 
+def tema_ruleta_upload_to(instance, filename):
+    tema = slugify(instance.nombre) or "tema"
+    return f'ruleta_temas/{tema}/{filename}'
+
+
 class TemaRuleta(models.Model):
     nombre = models.CharField(max_length=100, unique=True)
     fondo_ruleta = color_field("Fondo de ruleta", "#003468")
@@ -398,6 +405,30 @@ class TemaRuleta(models.Model):
     puntero_inicio = color_field("Puntero inicio", "#e1253c")
     puntero_medio = color_field("Puntero medio", "#c54954")
     puntero_fin = color_field("Puntero fin", "#97222d")
+    imagen_encabezado_ruleta = models.ImageField(
+        "Imagen de encabezado de ruleta",
+        upload_to=tema_ruleta_upload_to,
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Banner superior usado en la pantalla de la ruleta."
+    )
+    imagen_encabezado_premio = models.ImageField(
+        "Imagen de encabezado de premio ganado",
+        upload_to=tema_ruleta_upload_to,
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Banner superior usado en la pantalla de premio ganado."
+    )
+    imagen_fondo_ruleta = models.ImageField(
+        "Imagen de fondo de ruleta",
+        upload_to=tema_ruleta_upload_to,
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Imagen de fondo para la ruleta y su simulador. Si queda vacia se usa el color de fondo."
+    )
     activo = models.BooleanField(default=True)
 
     class Meta:
@@ -426,7 +457,27 @@ class TemaRuleta(models.Model):
             '--pointer-color-1': '#e1253c',
             '--pointer-color-2': '#c54954',
             '--pointer-color-3': '#97222d',
+            '--ruleta-header-image': 'var(--ruleta-header-image-default)',
+            '--premio-header-image': 'var(--premio-header-image-default)',
+            '--ruleta-bg-image': 'none',
         }
+
+    @staticmethod
+    def image_url(image_field):
+        if image_field and image_field.name:
+            if image_field.name.startswith('static/'):
+                return f'{settings.STATIC_URL}{image_field.name.removeprefix("static/")}'
+            if image_field.name.startswith('/static/') or image_field.name.startswith('/media/'):
+                return image_field.name
+            return image_field.url
+        return ''
+
+    @classmethod
+    def _image_css_value(cls, image_field, fallback):
+        image_url = cls.image_url(image_field)
+        if image_url:
+            return f'url("{image_url}")'
+        return fallback
 
     def css_variables(self):
         variables = self.default_css_variables()
@@ -446,6 +497,15 @@ class TemaRuleta(models.Model):
             '--pointer-color-1': self.puntero_inicio,
             '--pointer-color-2': self.puntero_medio,
             '--pointer-color-3': self.puntero_fin,
+            '--ruleta-header-image': self._image_css_value(
+                self.imagen_encabezado_ruleta,
+                'var(--ruleta-header-image-default)'
+            ),
+            '--premio-header-image': self._image_css_value(
+                self.imagen_encabezado_premio,
+                'var(--premio-header-image-default)'
+            ),
+            '--ruleta-bg-image': self._image_css_value(self.imagen_fondo_ruleta, 'none'),
         })
         return variables
 

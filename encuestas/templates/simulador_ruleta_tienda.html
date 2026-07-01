@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100..900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'css/ruleta.css' %}?v=20260629-ruleta-pointer-before-restore">
+<link rel="stylesheet" href="{% static 'css/ruleta.css' %}?v=20260701-ruleta-theme-images">
 {% include 'includes/ruleta_tema_vars.html' %}
 {% endblock %}
 
@@ -68,6 +68,7 @@
                     <span class="badge badge-soft">{{ tienda.nombre }}</span>
                 </div>
                 <div class="card-body">
+                    <div class="ruleta-header-banner mb-3" aria-label="Encabezado de ruleta"></div>
                     {% if detalle_premios %}
                         <div class="mb-3 sim-meta">
                             <span class="badge text-bg-secondary">Encuesta: {{ encuesta.titulo }}</span>
@@ -88,6 +89,12 @@
                             </div>
                         </div>
                         <div class="ruleta-pointer"></div>
+                    </div>
+                    <div class="simulador-copy-preview">
+                        <p><strong>{{ simulador_encabezado|linebreaksbr }}</strong></p>
+                        <p>Cliente: {{ simulador_cliente }}</p>
+                        <p>Ticket: {{ simulador_ticket }}</p>
+                        <p class="simulador-copy-muted">{{ simulador_texto|linebreaksbr }}</p>
                     </div>
                     {% endif %}
                 </div>

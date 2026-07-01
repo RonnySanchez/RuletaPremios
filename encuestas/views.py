@@ -752,6 +752,10 @@ def simulador_ruleta_tienda(request):
         'encuesta_id_seleccionada': int(encuesta_id) if encuesta_id and str(encuesta_id).isdigit() else None,
         'tienda_id_seleccionada': int(tienda_id) if tienda_id and str(tienda_id).isdigit() else None,
         'ruleta_theme_vars': _ruleta_theme_vars(encuesta),
+        'simulador_encabezado': encuesta.encabezado.strip() if encuesta and encuesta.encabezado else 'Gracias por participar en la Ruleta de Premios',
+        'simulador_texto': encuesta.texto.strip() if encuesta and encuesta.texto else 'Conserva tu ticket y acercate a tienda para validar el resultado.',
+        'simulador_cliente': 'Cliente de prueba',
+        'simulador_ticket': 'SIMULADOR-999',
     }
     return render(request, 'simulador_ruleta_tienda.html', context)
 

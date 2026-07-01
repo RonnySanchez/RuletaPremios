@@ -1,5 +1,7 @@
 import json
+from pathlib import Path
 
+from django.conf import settings
 from django.contrib import admin
 from django import forms
 from django.utils.html import format_html, mark_safe
@@ -7,7 +9,7 @@ from django.urls import reverse
 from .models import Encuesta, TicketConsulta, Pregunta, Opcion, PreguntaOpcion, EncuestaPregunta, Respuesta, TicketVentasEnLinea, Tienda, Pais, Region, Premio, Tienda, TiendaPremio, FormularioEncFija, TemaRuleta, EncuestaFija, EncuestaFijaRespuesta, EncuestaFijaPremio
 from import_export import resources, fields
 from import_export.widgets import ForeignKeyWidget
-from import_export.admin import ImportExportModelAdmin
+from import_export.admin import ExportMixin, ImportExportModelAdmin
 
 
 TEMA_RULETA_COLOR_FIELDS = (
@@ -26,6 +28,77 @@ TEMA_RULETA_COLOR_FIELDS = (
     'puntero_medio',
     'puntero_fin',
 )
+
+
+TEMA_RULETA_IMAGE_SELECTOR_FIELDS = {
+    'imagen_encabezado_ruleta': 'imagen_encabezado_ruleta_existente',
+    'imagen_encabezado_premio': 'imagen_encabezado_premio_existente',
+    'imagen_fondo_ruleta': 'imagen_fondo_ruleta_existente',
+}
+
+TEMA_RULETA_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
+
+
+def _clean_import_text(value):
+    return str(value).strip() if value is not None else ''
+
+
+def _clean_import_bool(value):
+    if value is None:
+        return False
+    return str(value).strip().lower() in {
+        '1', 'true', 'si', 's', 'yes', 'y', 'v', 'verdadero'
+    }
+
+
+class AutoCreateForeignKeyWidget(ForeignKeyWidget):
+    def clean(self, value, row=None, **kwargs):
+        value = _clean_import_text(value)
+        if not value:
+            return None
+        obj, _ = self.model.objects.get_or_create(**{self.field: value})
+        return obj
+
+
+class RegionByPaisWidget(ForeignKeyWidget):
+    def clean(self, value, row=None, **kwargs):
+        region_nombre = _clean_import_text(value)
+        if not region_nombre:
+            return None
+
+        pais_nombre = _clean_import_text((row or {}).get('pais__nombre'))
+        if pais_nombre:
+            pais, _ = Pais.objects.get_or_create(nombre=pais_nombre)
+            region, _ = Region.objects.get_or_create(nombre=region_nombre, pais=pais)
+            return region
+
+        return self.model.objects.get(nombre=region_nombre)
+
+
+def _tema_ruleta_image_choices():
+    choices = [('', 'Mantener imagen actual o subir nueva')]
+    media_root = Path(settings.MEDIA_ROOT)
+    theme_root = media_root / 'ruleta_temas'
+
+    if theme_root.exists():
+        for path in sorted(theme_root.rglob('*')):
+            if path.is_file() and path.suffix.lower() in TEMA_RULETA_IMAGE_EXTENSIONS:
+                relative_path = path.relative_to(media_root).as_posix()
+                choices.append((relative_path, relative_path))
+
+    for static_dir in getattr(settings, 'STATICFILES_DIRS', []):
+        static_root = Path(static_dir)
+        for subdir in ('images', 'img'):
+            image_root = static_root / subdir
+            if not image_root.exists():
+                continue
+            for path in sorted(image_root.rglob('*')):
+                if path.is_file() and path.suffix.lower() in TEMA_RULETA_IMAGE_EXTENSIONS:
+                    relative_path = path.relative_to(static_root).as_posix()
+                    value = f'static/{relative_path}'
+                    choices.append((value, value))
+
+    return choices
 
 
 class ColorPickerTextWidget(forms.TextInput):
@@ -50,6 +123,22 @@ class ColorPickerTextWidget(forms.TextInput):
 
 
 class TemaRuletaAdminForm(forms.ModelForm):
+    imagen_encabezado_ruleta_existente = forms.ChoiceField(
+        label='Seleccionar encabezado de ruleta del servidor',
+        required=False,
+        choices=()
+    )
+    imagen_encabezado_premio_existente = forms.ChoiceField(
+        label='Seleccionar encabezado de premio del servidor',
+        required=False,
+        choices=()
+    )
+    imagen_fondo_ruleta_existente = forms.ChoiceField(
+        label='Seleccionar fondo de ruleta del servidor',
+        required=False,
+        choices=()
+    )
+
     class Meta:
         model = TemaRuleta
         fields = '__all__'
@@ -57,6 +146,38 @@ class TemaRuletaAdminForm(forms.ModelForm):
             field: ColorPickerTextWidget()
             for field in TEMA_RULETA_COLOR_FIELDS
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        base_choices = _tema_ruleta_image_choices()
+
+        for image_field, selector_field in TEMA_RULETA_IMAGE_SELECTOR_FIELDS.items():
+            choices = list(base_choices)
+            current_image = getattr(self.instance, image_field, None)
+            current_name = current_image.name if current_image and current_image.name else ''
+            if current_name and current_name not in dict(choices):
+                choices.insert(1, (current_name, current_name))
+            self.fields[selector_field].choices = choices
+            self.fields[selector_field].initial = current_name
+            self.fields[selector_field].widget.attrs.update({
+                'class': 'ruleta-image-source',
+            })
+
+    def save(self, commit=True):
+        obj = super().save(commit=False)
+
+        for image_field, selector_field in TEMA_RULETA_IMAGE_SELECTOR_FIELDS.items():
+            clear_requested = f'{image_field}-clear' in self.data
+            selected_image = self.cleaned_data.get(selector_field)
+            uploaded_image = self.files.get(image_field)
+
+            if selected_image and not uploaded_image and not clear_requested:
+                setattr(obj, image_field, selected_image)
+
+        if commit:
+            obj.save()
+            self.save_m2m()
+        return obj
 
 
 @admin.register(TemaRuleta)
@@ -71,6 +192,11 @@ class TemaRuletaAdmin(admin.ModelAdmin):
     )
     list_filter = ('activo',)
     search_fields = ('nombre',)
+    readonly_fields = (
+        'vista_imagen_encabezado_ruleta',
+        'vista_imagen_encabezado_premio',
+        'vista_imagen_fondo_ruleta',
+    )
     fieldsets = (
         (None, {
             'fields': ('nombre', 'activo')
@@ -82,6 +208,19 @@ class TemaRuletaAdmin(admin.ModelAdmin):
                 'fondo_sin_premio',
                 'texto_principal',
                 'texto_secundario',
+            )
+        }),
+        ('Imagenes', {
+            'fields': (
+                'vista_imagen_encabezado_ruleta',
+                'imagen_encabezado_ruleta',
+                'imagen_encabezado_ruleta_existente',
+                'vista_imagen_encabezado_premio',
+                'imagen_encabezado_premio',
+                'imagen_encabezado_premio_existente',
+                'vista_imagen_fondo_ruleta',
+                'imagen_fondo_ruleta',
+                'imagen_fondo_ruleta_existente',
             )
         }),
         ('Colores de la ruleta', {
@@ -102,6 +241,28 @@ class TemaRuletaAdmin(admin.ModelAdmin):
             )
         }),
     )
+
+    def _image_preview(self, obj, field_name):
+        image_field = getattr(obj, field_name, None)
+        if image_field and image_field.name:
+            return format_html(
+                '<div class="ruleta-theme-image-preview"><img src="{}" alt=""><span>{}</span></div>',
+                TemaRuleta.image_url(image_field),
+                image_field.name
+            )
+        return "Sin imagen"
+
+    def vista_imagen_encabezado_ruleta(self, obj):
+        return self._image_preview(obj, 'imagen_encabezado_ruleta')
+    vista_imagen_encabezado_ruleta.short_description = 'Vista encabezado ruleta'
+
+    def vista_imagen_encabezado_premio(self, obj):
+        return self._image_preview(obj, 'imagen_encabezado_premio')
+    vista_imagen_encabezado_premio.short_description = 'Vista encabezado premio'
+
+    def vista_imagen_fondo_ruleta(self, obj):
+        return self._image_preview(obj, 'imagen_fondo_ruleta')
+    vista_imagen_fondo_ruleta.short_description = 'Vista fondo ruleta'
 
     def _color_preview(self, value):
         return format_html(
@@ -131,9 +292,11 @@ class TemaRuletaAdmin(admin.ModelAdmin):
 
 
 class PremioResources(resources.ModelResource):
-    fields = ('nombre', 'id', 'es_premio')
     class Meta:
         model = Premio
+        fields = ('id', 'nombre', 'descripcion', 'es_premio', 'imagen')
+        export_order = fields
+        import_id_fields = ('nombre',)
 
 
 
@@ -178,8 +341,7 @@ class TiendaPremioResource(resources.ModelResource):
 
     class Meta:
         model = TiendaPremio
-        # Usamos el 'id' como llave maestra, aunque no venga en el Excel
-        import_id_fields = ('id',) 
+        import_id_fields = ('tienda', 'premio')
         # Incluimos todos tus campos personalizados
         fields = ('id', 'tienda', 'premio', 'cantidad', 'monto_minimo_premio', 'fecha_activacion', 'visible', 'orden')
         skip_unchanged = True
@@ -188,15 +350,16 @@ class TiendaPremioResource(resources.ModelResource):
     def before_import_row(self, row, **kwargs):
         # 1. Limpiar el campo booleano 'visible' por si acaso
         if 'visible' in row and row['visible'] is not None:
-            val = str(row['visible']).strip().lower()
-            row['visible'] = val in ['1', 'true', 'sí', 'si', 'yes', 'v']
+            row['visible'] = _clean_import_bool(row['visible'])
 
         tienda_nombre = row.get('tienda__nombre')
         premio_nombre = row.get('premio__nombre')
 
         if tienda_nombre and premio_nombre:
-            tienda_nombre = str(tienda_nombre).strip()
-            premio_nombre = str(premio_nombre).strip()
+            tienda_nombre = _clean_import_text(tienda_nombre)
+            premio_nombre = _clean_import_text(premio_nombre)
+            row['tienda__nombre'] = tienda_nombre
+            row['premio__nombre'] = premio_nombre
 
             try:
                 # Buscamos la tienda por nombre
@@ -256,12 +419,12 @@ class TiendaResources(resources.ModelResource):
     pais = fields.Field(
         column_name='pais__nombre',
         attribute='pais',
-        widget=ForeignKeyWidget(Pais, field='nombre')
+        widget=AutoCreateForeignKeyWidget(Pais, field='nombre')
     )
     region = fields.Field(
         column_name='region__nombre',
         attribute='region',
-        widget=ForeignKeyWidget(Region, field='nombre')
+        widget=RegionByPaisWidget(Region, field='nombre')
     )
 
     class Meta:
@@ -283,19 +446,31 @@ class TiendaResources(resources.ModelResource):
     def before_import_row(self, row, **kwargs):
         # A. Limpiar el campo booleano 'activa' (A veces el Excel trae 'Verdadero', '1', o 'TRUE')
         if 'activa' in row and row['activa'] is not None:
-            val = str(row['activa']).strip().lower()
-            row['activa'] = val in ['1', 'true', 'sí', 'si', 'yes', 'v']
+            row['activa'] = _clean_import_bool(row['activa'])
+
+        if 'requiere_validacion_ticket' in row and row['requiere_validacion_ticket'] is not None:
+            row['requiere_validacion_ticket'] = _clean_import_bool(row['requiere_validacion_ticket'])
+
+        if 'nombre' in row:
+            row['nombre'] = _clean_import_text(row['nombre'])
 
         # B. Limpiar y Auto-Crear Países faltantes para que no crashee
         pais_nombre = row.get('pais__nombre')
         if pais_nombre:
+            pais_nombre = _clean_import_text(pais_nombre)
+            row['pais__nombre'] = pais_nombre
             # Si el país que viene en el Excel no existe en tu BD, lo crea en silencio
-            Pais.objects.get_or_create(nombre=pais_nombre.strip())
+            pais_obj, _ = Pais.objects.get_or_create(nombre=pais_nombre)
+        else:
+            pais_obj = None
 
         # C. Limpiar y Auto-Crear Regiones faltantes
         region_nombre = row.get('region__nombre')
         if region_nombre:
-            Region.objects.get_or_create(nombre=region_nombre.strip())
+            region_nombre = _clean_import_text(region_nombre)
+            row['region__nombre'] = region_nombre
+            if pais_obj:
+                Region.objects.get_or_create(nombre=region_nombre, pais=pais_obj)
 
 
 @admin.register(Tienda)
@@ -457,7 +632,7 @@ class EncuestaFijaRespuestaResources(resources.ModelResource):
 
 
 @admin.register(EncuestaFijaRespuesta)
-class EncuestaFijaRespuestaAdmin(ImportExportModelAdmin):
+class EncuestaFijaRespuestaAdmin(ExportMixin, admin.ModelAdmin):
     resource_class = EncuestaFijaRespuestaResources
     # Visualización con columnas individuales para cada valoración
     list_display = (
@@ -490,7 +665,7 @@ class EncuestaFijaPremioResources(resources.ModelResource):
         model = EncuestaFijaPremio
 
 @admin.register(EncuestaFijaPremio)
-class EncuestaFijaPremioAdmin(ImportExportModelAdmin):
+class EncuestaFijaPremioAdmin(ExportMixin, admin.ModelAdmin):
     resource_class = EncuestaFijaPremioResources
     # Campos que se mostrarán en la lista del panel administrativo
     list_display = ('nombre', 'apellidos', 'codigo_ticket', 'DNI', 'premio', 'fecha_respuesta', 'tienda')

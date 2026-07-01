@@ -449,3 +449,246 @@
         initColorPickers();
     }
 })();
+
+(function () {
+    function resolveImageUrl(value) {
+        if (!value) {
+            return '';
+        }
+
+        if (value.indexOf('/static/') === 0 || value.indexOf('/media/') === 0) {
+            return value;
+        }
+
+        if (value.indexOf('static/') === 0) {
+            return '/static/' + value.replace(/^static\//, '');
+        }
+
+        return '/media/' + value;
+    }
+
+    function closeImagePickers() {
+        document.querySelectorAll('.ruleta-image-picker-panel').forEach(function (panel) {
+            panel.hidden = true;
+        });
+    }
+
+    function positionImagePanel(picker) {
+        var panel = picker._ruletaImagePanel;
+        var selectedButton = picker.querySelector('.ruleta-image-selected');
+
+        if (!panel || !selectedButton) {
+            return;
+        }
+
+        var rect = selectedButton.getBoundingClientRect();
+        var panelWidth = Math.min(Math.max(rect.width, 520), window.innerWidth - 16);
+        var left = Math.min(Math.max(8, rect.left), window.innerWidth - panelWidth - 8);
+        var top = rect.bottom + 6;
+        var panelHeight = Math.min(420, window.innerHeight - top - 8);
+
+        if (panelHeight < 240 && rect.top > window.innerHeight / 2) {
+            panelHeight = Math.min(420, rect.top - 8);
+            top = Math.max(8, rect.top - panelHeight - 6);
+        }
+
+        panel.style.left = left + 'px';
+        panel.style.top = top + 'px';
+        panel.style.width = panelWidth + 'px';
+        panel.style.maxHeight = panelHeight + 'px';
+    }
+
+    function setSelectedImage(select, picker, value) {
+        var url = resolveImageUrl(value);
+        var image = picker.querySelector('.ruleta-image-selected-img');
+        var path = picker.querySelector('.ruleta-image-selected-path');
+        var panel = picker._ruletaImagePanel || picker;
+
+        select.value = value;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+
+        if (url) {
+            image.src = url;
+            image.hidden = false;
+            path.textContent = value;
+        } else {
+            image.removeAttribute('src');
+            image.hidden = true;
+            path.textContent = 'Mantener imagen actual o subir nueva';
+        }
+
+        panel.querySelectorAll('.ruleta-image-option').forEach(function (option) {
+            option.setAttribute('aria-pressed', option.dataset.value === value ? 'true' : 'false');
+        });
+    }
+
+    function filterImageOptions(picker, term) {
+        var normalizedTerm = (term || '').trim().toLowerCase();
+        var panel = picker._ruletaImagePanel || picker;
+        var visibleCount = 0;
+
+        panel.querySelectorAll('.ruleta-image-option').forEach(function (option) {
+            var matches = !normalizedTerm || option.dataset.search.indexOf(normalizedTerm) !== -1;
+            option.hidden = !matches;
+            if (matches) {
+                visibleCount += 1;
+            }
+        });
+
+        var emptyState = panel.querySelector('.ruleta-image-empty');
+        if (emptyState) {
+            emptyState.hidden = visibleCount !== 0;
+        }
+    }
+
+    function createImageOption(option, picker, select) {
+        var value = option.value;
+        var button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'ruleta-image-option';
+        button.dataset.value = value;
+        button.dataset.search = (value + ' ' + option.textContent).toLowerCase();
+        button.setAttribute('aria-pressed', 'false');
+
+        if (value) {
+            var image = document.createElement('img');
+            image.src = resolveImageUrl(value);
+            image.alt = '';
+            image.loading = 'lazy';
+            button.appendChild(image);
+        } else {
+            var placeholder = document.createElement('span');
+            placeholder.className = 'ruleta-image-placeholder';
+            placeholder.textContent = 'Sin imagen';
+            button.appendChild(placeholder);
+        }
+
+        var label = document.createElement('span');
+        label.textContent = option.textContent || value;
+        button.appendChild(label);
+
+        button.addEventListener('click', function () {
+            setSelectedImage(select, picker, value);
+            closeImagePickers();
+        });
+
+        return button;
+    }
+
+    function attachImagePicker(select) {
+        if (select.dataset.imagePickerAttached === '1') {
+            return;
+        }
+
+        select.dataset.imagePickerAttached = '1';
+        select.classList.add('ruleta-image-source-hidden');
+
+        var picker = document.createElement('div');
+        picker.className = 'ruleta-image-picker';
+
+        var selectedButton = document.createElement('button');
+        selectedButton.type = 'button';
+        selectedButton.className = 'ruleta-image-selected';
+
+        var selectedImage = document.createElement('img');
+        selectedImage.className = 'ruleta-image-selected-img';
+        selectedImage.alt = '';
+        selectedImage.hidden = true;
+
+        var selectedPath = document.createElement('span');
+        selectedPath.className = 'ruleta-image-selected-path';
+
+        selectedButton.appendChild(selectedImage);
+        selectedButton.appendChild(selectedPath);
+        picker.appendChild(selectedButton);
+
+        var panel = document.createElement('div');
+        panel.className = 'ruleta-image-picker-panel';
+        panel.hidden = true;
+
+        var search = document.createElement('input');
+        search.type = 'search';
+        search.className = 'ruleta-image-search';
+        search.placeholder = 'Buscar imagen...';
+        search.autocomplete = 'off';
+        panel.appendChild(search);
+
+        var list = document.createElement('div');
+        list.className = 'ruleta-image-options';
+        Array.from(select.options).forEach(function (option) {
+            list.appendChild(createImageOption(option, picker, select));
+        });
+        panel.appendChild(list);
+
+        var emptyState = document.createElement('div');
+        emptyState.className = 'ruleta-image-empty';
+        emptyState.hidden = true;
+        emptyState.textContent = 'Sin resultados';
+        panel.appendChild(emptyState);
+
+        select.insertAdjacentElement('afterend', picker);
+        document.body.appendChild(panel);
+        picker._ruletaImagePanel = panel;
+        panel._ruletaImagePicker = picker;
+
+        selectedButton.addEventListener('click', function () {
+            var shouldOpen = panel.hidden;
+            closeImagePickers();
+            panel.hidden = !shouldOpen;
+            if (shouldOpen) {
+                search.value = '';
+                filterImageOptions(picker, '');
+                positionImagePanel(picker);
+                search.focus();
+            }
+        });
+
+        search.addEventListener('input', function () {
+            filterImageOptions(picker, search.value);
+        });
+
+        select.addEventListener('change', function () {
+            setSelectedImage(select, picker, select.value);
+        });
+
+        setSelectedImage(select, picker, select.value);
+    }
+
+    function initImagePickers() {
+        document.querySelectorAll('select.ruleta-image-source').forEach(attachImagePicker);
+    }
+
+    document.addEventListener('click', function (event) {
+        if (!event.target.closest('.ruleta-image-picker') && !event.target.closest('.ruleta-image-picker-panel')) {
+            closeImagePickers();
+        }
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+            closeImagePickers();
+        }
+    });
+
+    window.addEventListener('resize', function () {
+        document.querySelectorAll('.ruleta-image-picker-panel:not([hidden])').forEach(function (panel) {
+            if (panel._ruletaImagePicker) {
+                positionImagePanel(panel._ruletaImagePicker);
+            }
+        });
+    });
+
+    window.addEventListener('scroll', function () {
+        document.querySelectorAll('.ruleta-image-picker-panel:not([hidden])').forEach(function (panel) {
+            if (panel._ruletaImagePicker) {
+                positionImagePanel(panel._ruletaImagePicker);
+            }
+        });
+    }, true);
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initImagePickers);
+    } else {
+        initImagePickers();
+    }
+})();
