@@ -564,6 +564,9 @@
         button.setAttribute('aria-pressed', 'false');
 
         if (url) {
+            var thumb = document.createElement('span');
+            thumb.className = 'ruleta-image-option-thumb';
+
             var image = document.createElement('img');
             image.src = url;
             image.alt = '';
@@ -572,7 +575,8 @@
                 image.hidden = true;
                 button.classList.add('ruleta-image-option-missing');
             });
-            button.appendChild(image);
+            thumb.appendChild(image);
+            button.appendChild(thumb);
         } else {
             var placeholder = document.createElement('span');
             placeholder.className = 'ruleta-image-placeholder';
@@ -607,6 +611,9 @@
         selectedButton.type = 'button';
         selectedButton.className = 'ruleta-image-selected';
 
+        var selectedThumb = document.createElement('span');
+        selectedThumb.className = 'ruleta-image-selected-thumb';
+
         var selectedImage = document.createElement('img');
         selectedImage.className = 'ruleta-image-selected-img';
         selectedImage.alt = '';
@@ -615,7 +622,8 @@
         var selectedPath = document.createElement('span');
         selectedPath.className = 'ruleta-image-selected-path';
 
-        selectedButton.appendChild(selectedImage);
+        selectedThumb.appendChild(selectedImage);
+        selectedButton.appendChild(selectedThumb);
         selectedButton.appendChild(selectedPath);
         picker.appendChild(selectedButton);
 

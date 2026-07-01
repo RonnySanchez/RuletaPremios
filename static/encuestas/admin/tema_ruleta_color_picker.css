@@ -235,13 +235,26 @@
     outline: none;
 }
 
-.ruleta-image-selected-img {
+.ruleta-image-selected-thumb {
+    align-items: center;
     background: #f6f6f6;
     border: 1px solid #d4d4d4;
     border-radius: 4px;
+    box-sizing: border-box;
+    display: grid;
     height: 48px;
-    object-fit: contain;
+    justify-items: center;
+    overflow: hidden;
+    padding: 4px;
+    place-items: center;
     width: 96px;
+}
+
+.ruleta-image-selected-img {
+    display: block;
+    max-height: 100%;
+    max-width: 100%;
+    object-fit: contain;
 }
 
 .ruleta-image-selected-path {
@@ -317,24 +330,33 @@
     border-color: #8bbcff;
 }
 
-.ruleta-image-option img {
+.ruleta-image-option-thumb {
+    align-items: center;
     background: #f6f6f6;
     border: 1px solid #d4d4d4;
     border-radius: 3px;
     box-sizing: border-box;
-    display: block !important;
+    display: grid !important;
     height: 42px;
-    object-fit: contain;
-    opacity: 1 !important;
-    visibility: visible !important;
+    justify-items: center;
+    overflow: hidden;
+    padding: 3px;
+    place-items: center;
     width: 74px;
 }
 
-.ruleta-image-option-missing::before {
+.ruleta-image-option img {
+    display: block !important;
+    max-height: 100%;
+    max-width: 100%;
+    object-fit: contain;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+.ruleta-image-option-missing .ruleta-image-option-thumb::before {
     align-items: center;
     background: #fff6f6;
-    border: 1px dashed #c98b8b;
-    border-radius: 3px;
     color: #9a3b3b;
     content: "No disponible";
     display: flex;
