@@ -429,6 +429,14 @@ class TemaRuleta(models.Model):
         blank=True,
         help_text="Imagen de fondo para la ruleta y su simulador. Si queda vacia se usa el color de fondo."
     )
+    imagen_aro_ruleta = models.ImageField(
+        "Imagen de aro de ruleta",
+        upload_to=tema_ruleta_upload_to,
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Imagen superpuesta que forma el aro exterior de la ruleta."
+    )
     activo = models.BooleanField(default=True)
 
     class Meta:
@@ -460,6 +468,7 @@ class TemaRuleta(models.Model):
             '--ruleta-header-image': 'var(--ruleta-header-image-default)',
             '--premio-header-image': 'var(--premio-header-image-default)',
             '--ruleta-bg-image': 'none',
+            '--ruleta-aro-image': 'var(--ruleta-aro-image-default)',
         }
 
     @staticmethod
@@ -506,6 +515,10 @@ class TemaRuleta(models.Model):
                 'var(--premio-header-image-default)'
             ),
             '--ruleta-bg-image': self._image_css_value(self.imagen_fondo_ruleta, 'none'),
+            '--ruleta-aro-image': self._image_css_value(
+                self.imagen_aro_ruleta,
+                'var(--ruleta-aro-image-default)'
+            ),
         })
         return variables
 

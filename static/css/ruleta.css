@@ -18,9 +18,11 @@
     --simulador-bg-color: var(--ef-blue);
     --ruleta-header-image-default: url("../images/gira y gana.png");
     --premio-header-image-default: url("../images/felicidades1.png");
+    --ruleta-aro-image-default: url("../images/AroRuleta1.png");
     --ruleta-header-image: var(--ruleta-header-image-default);
     --premio-header-image: var(--premio-header-image-default);
     --ruleta-bg-image: none;
+    --ruleta-aro-image: var(--ruleta-aro-image-default);
     --wheel-color-1: var(--ef-red-muted);
     --wheel-color-2: var(--ef-blue);
     --wheel-color-3: var(--ef-red-dark);
@@ -207,7 +209,7 @@ body.simulador-page {
     content: "";
     position: absolute;
     inset: 0;
-    background-image: url("../images/AroRuleta1.png");
+    background-image: var(--ruleta-aro-image);
     background-size: contain;
     background-repeat: no-repeat;
     z-index: 10;

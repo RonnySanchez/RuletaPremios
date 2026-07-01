@@ -34,6 +34,7 @@ TEMA_RULETA_IMAGE_SELECTOR_FIELDS = {
     'imagen_encabezado_ruleta': 'imagen_encabezado_ruleta_existente',
     'imagen_encabezado_premio': 'imagen_encabezado_premio_existente',
     'imagen_fondo_ruleta': 'imagen_fondo_ruleta_existente',
+    'imagen_aro_ruleta': 'imagen_aro_ruleta_existente',
 }
 
 TEMA_RULETA_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
@@ -138,6 +139,11 @@ class TemaRuletaAdminForm(forms.ModelForm):
         required=False,
         choices=()
     )
+    imagen_aro_ruleta_existente = forms.ChoiceField(
+        label='Seleccionar aro de ruleta del servidor',
+        required=False,
+        choices=()
+    )
 
     class Meta:
         model = TemaRuleta
@@ -196,6 +202,7 @@ class TemaRuletaAdmin(admin.ModelAdmin):
         'vista_imagen_encabezado_ruleta',
         'vista_imagen_encabezado_premio',
         'vista_imagen_fondo_ruleta',
+        'vista_imagen_aro_ruleta',
     )
     fieldsets = (
         (None, {
@@ -221,6 +228,9 @@ class TemaRuletaAdmin(admin.ModelAdmin):
                 'vista_imagen_fondo_ruleta',
                 'imagen_fondo_ruleta',
                 'imagen_fondo_ruleta_existente',
+                'vista_imagen_aro_ruleta',
+                'imagen_aro_ruleta',
+                'imagen_aro_ruleta_existente',
             )
         }),
         ('Colores de la ruleta', {
@@ -263,6 +273,10 @@ class TemaRuletaAdmin(admin.ModelAdmin):
     def vista_imagen_fondo_ruleta(self, obj):
         return self._image_preview(obj, 'imagen_fondo_ruleta')
     vista_imagen_fondo_ruleta.short_description = 'Vista fondo ruleta'
+
+    def vista_imagen_aro_ruleta(self, obj):
+        return self._image_preview(obj, 'imagen_aro_ruleta')
+    vista_imagen_aro_ruleta.short_description = 'Vista aro ruleta'
 
     def _color_preview(self, value):
         return format_html(
