@@ -359,11 +359,11 @@ class TemaRuletaAdmin(admin.ModelAdmin):
     class Media:
         css = {
             'all': (
-                f'{settings.STATIC_URL}encuestas/admin/tema_ruleta_color_picker.css?v=20260701-image-preview-centered',
+                f'{settings.STATIC_URL}encuestas/admin/tema_ruleta_color_picker.css?v=20260701-image-preview-fix',
             )
         }
         js = (
-            f'{settings.STATIC_URL}encuestas/admin/tema_ruleta_color_picker.js?v=20260701-image-preview-centered',
+            f'{settings.STATIC_URL}encuestas/admin/tema_ruleta_color_picker.js?v=20260701-image-preview-fix',
         )
 
 

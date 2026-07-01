@@ -508,7 +508,7 @@
         panel.style.height = panelHeight + 'px';
     }
 
-    function setSelectedImage(select, picker, value) {
+    function setSelectedImage(select, picker, value, shouldNotify) {
         var option = findOptionByValue(select, value);
         var url = resolveImageUrl(value, option);
         var image = picker.querySelector('.ruleta-image-selected-img');
@@ -516,7 +516,9 @@
         var panel = picker._ruletaImagePanel || picker;
 
         select.value = value;
-        select.dispatchEvent(new Event('change', { bubbles: true }));
+        if (shouldNotify) {
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+        }
 
         if (url) {
             image.src = url;
@@ -589,7 +591,7 @@
         button.appendChild(label);
 
         button.addEventListener('click', function () {
-            setSelectedImage(select, picker, value);
+            setSelectedImage(select, picker, value, true);
             closeImagePickers();
         });
 
@@ -673,10 +675,10 @@
         });
 
         select.addEventListener('change', function () {
-            setSelectedImage(select, picker, select.value);
+            setSelectedImage(select, picker, select.value, false);
         });
 
-        setSelectedImage(select, picker, select.value);
+        setSelectedImage(select, picker, select.value, false);
     }
 
     function initImagePickers() {
