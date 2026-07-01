@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from urllib.parse import quote
 
 from django.conf import settings
 from django.contrib import admin
@@ -102,6 +103,60 @@ def _tema_ruleta_image_choices():
     return choices
 
 
+def _build_static_or_media_url(base_url, relative_path):
+    return f'{base_url.rstrip("/")}/{quote(relative_path.lstrip("/"), safe="/")}'
+
+
+def _tema_ruleta_image_path(value):
+    if not value:
+        return None
+
+    if value.startswith('static/'):
+        relative_path = value.removeprefix('static/')
+        for static_dir in getattr(settings, 'STATICFILES_DIRS', []):
+            path = Path(static_dir) / relative_path
+            if path.exists():
+                return path
+        return None
+
+    if value.startswith('/static/'):
+        return _tema_ruleta_image_path(f'static/{value.removeprefix("/static/")}')
+
+    if value.startswith('/media/'):
+        return Path(settings.MEDIA_ROOT) / value.removeprefix('/media/')
+
+    return Path(settings.MEDIA_ROOT) / value
+
+
+def _tema_ruleta_image_url(value):
+    if not value:
+        return ''
+
+    if value.startswith('static/'):
+        url = _build_static_or_media_url(settings.STATIC_URL, value.removeprefix('static/'))
+    elif value.startswith('/static/'):
+        url = _build_static_or_media_url(settings.STATIC_URL, value.removeprefix('/static/'))
+    elif value.startswith('/media/'):
+        url = _build_static_or_media_url(settings.MEDIA_URL, value.removeprefix('/media/'))
+    else:
+        url = _build_static_or_media_url(settings.MEDIA_URL, value)
+
+    path = _tema_ruleta_image_path(value)
+    if path and path.exists():
+        return f'{url}?v={int(path.stat().st_mtime)}'
+
+    return url
+
+
+class ImageChoiceSelect(forms.Select):
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex, attrs)
+        option_value = str(value or '')
+        if option_value:
+            option['attrs']['data-image-url'] = _tema_ruleta_image_url(option_value)
+        return option
+
+
 class ColorPickerTextWidget(forms.TextInput):
     PRESET_COLORS = [
         '#003468', '#c54954', '#97222d', '#6b96b8',
@@ -127,22 +182,26 @@ class TemaRuletaAdminForm(forms.ModelForm):
     imagen_encabezado_ruleta_existente = forms.ChoiceField(
         label='Seleccionar encabezado de ruleta del servidor',
         required=False,
-        choices=()
+        choices=(),
+        widget=ImageChoiceSelect
     )
     imagen_encabezado_premio_existente = forms.ChoiceField(
         label='Seleccionar encabezado de premio del servidor',
         required=False,
-        choices=()
+        choices=(),
+        widget=ImageChoiceSelect
     )
     imagen_fondo_ruleta_existente = forms.ChoiceField(
         label='Seleccionar fondo de ruleta del servidor',
         required=False,
-        choices=()
+        choices=(),
+        widget=ImageChoiceSelect
     )
     imagen_aro_ruleta_existente = forms.ChoiceField(
         label='Seleccionar aro de ruleta del servidor',
         required=False,
-        choices=()
+        choices=(),
+        widget=ImageChoiceSelect
     )
 
     class Meta:
@@ -299,9 +358,13 @@ class TemaRuletaAdmin(admin.ModelAdmin):
 
     class Media:
         css = {
-            'all': ('encuestas/admin/tema_ruleta_color_picker.css',)
+            'all': (
+                f'{settings.STATIC_URL}encuestas/admin/tema_ruleta_color_picker.css?v=20260701-image-preview',
+            )
         }
-        js = ('encuestas/admin/tema_ruleta_color_picker.js',)
+        js = (
+            f'{settings.STATIC_URL}encuestas/admin/tema_ruleta_color_picker.js?v=20260701-image-preview',
+        )
 
 
 

@@ -330,6 +330,22 @@
     width: 74px;
 }
 
+.ruleta-image-option-missing::before {
+    align-items: center;
+    background: #fff6f6;
+    border: 1px dashed #c98b8b;
+    border-radius: 3px;
+    color: #9a3b3b;
+    content: "No disponible";
+    display: flex;
+    font-size: 10px;
+    height: 42px;
+    justify-content: center;
+    line-height: 1.15;
+    text-align: center;
+    width: 74px;
+}
+
 .ruleta-image-option span {
     color: #333;
     display: block !important;

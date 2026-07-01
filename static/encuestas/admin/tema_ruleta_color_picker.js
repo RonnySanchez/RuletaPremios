@@ -451,7 +451,11 @@
 })();
 
 (function () {
-    function resolveImageUrl(value) {
+    function resolveImageUrl(value, option) {
+        if (option && option.dataset && option.dataset.imageUrl) {
+            return option.dataset.imageUrl;
+        }
+
         if (!value) {
             return '';
         }
@@ -465,6 +469,12 @@
         }
 
         return '/media/' + value;
+    }
+
+    function findOptionByValue(select, value) {
+        return Array.from(select.options).find(function (option) {
+            return option.value === value;
+        });
     }
 
     function closeImagePickers() {
@@ -499,7 +509,8 @@
     }
 
     function setSelectedImage(select, picker, value) {
-        var url = resolveImageUrl(value);
+        var option = findOptionByValue(select, value);
+        var url = resolveImageUrl(value, option);
         var image = picker.querySelector('.ruleta-image-selected-img');
         var path = picker.querySelector('.ruleta-image-selected-path');
         var panel = picker._ruletaImagePanel || picker;
@@ -543,18 +554,24 @@
 
     function createImageOption(option, picker, select) {
         var value = option.value;
+        var url = resolveImageUrl(value, option);
         var button = document.createElement('button');
         button.type = 'button';
         button.className = 'ruleta-image-option';
         button.dataset.value = value;
+        button.dataset.imageUrl = url;
         button.dataset.search = (value + ' ' + option.textContent).toLowerCase();
         button.setAttribute('aria-pressed', 'false');
 
-        if (value) {
+        if (url) {
             var image = document.createElement('img');
-            image.src = resolveImageUrl(value);
+            image.src = url;
             image.alt = '';
             image.loading = 'lazy';
+            image.addEventListener('error', function () {
+                image.hidden = true;
+                button.classList.add('ruleta-image-option-missing');
+            });
             button.appendChild(image);
         } else {
             var placeholder = document.createElement('span');
