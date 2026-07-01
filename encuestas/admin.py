@@ -768,9 +768,15 @@ class EncuestaFijaPremioResources(resources.ModelResource):
 class EncuestaFijaPremioAdmin(ExportMixin, admin.ModelAdmin):
     resource_class = EncuestaFijaPremioResources
     # Campos que se mostrarán en la lista del panel administrativo
-    list_display = ('nombre', 'apellidos', 'codigo_ticket', 'DNI', 'premio', 'fecha_respuesta', 'tienda')
+    list_display = ('encuesta_fija', 'nombre', 'apellidos', 'codigo_ticket', 'DNI', 'premio', 'fecha_respuesta', 'tienda')
     # Añadir barra de búsqueda por los campos que desees
-    search_fields = ('nombre', 'apellidos', 'codigo_ticket', 'DNI', 'premio__nombre')
+    search_fields = ('encuesta_fija__titulo', 'nombre', 'apellidos', 'codigo_ticket', 'DNI', 'premio__nombre')
+    list_filter = (
+        ('encuesta_fija', admin.RelatedOnlyFieldListFilter),
+        'fecha_respuesta',
+        'tienda',
+        'premio',
+    )
     #list_editable = ('tienda',)
 
     def get_queryset(self, request):
