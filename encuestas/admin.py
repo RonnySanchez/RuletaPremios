@@ -736,10 +736,33 @@ class EncuestaFijaRespuestaAdmin(ExportMixin, admin.ModelAdmin):
     )
 
 class EncuestaFijaPremioResources(resources.ModelResource):
-    # fields = ('nombre', 'apellidos', 'codigo_ticket', 'DNI', 'premio', 'fecha_respuesta', 'tienda',)
+    premio_nombre = fields.Field(column_name='premio', readonly=True)
+    tienda_nombre = fields.Field(column_name='tienda', readonly=True)
+    encuesta_fija_titulo = fields.Field(column_name='encuesta_fija', readonly=True)
+
+    def dehydrate_premio_nombre(self, obj):
+        return obj.premio.nombre if obj.premio_id and obj.premio else ''
+
+    def dehydrate_tienda_nombre(self, obj):
+        return obj.tienda.nombre if obj.tienda_id and obj.tienda else ''
+
+    def dehydrate_encuesta_fija_titulo(self, obj):
+        return obj.encuesta_fija.titulo if obj.encuesta_fija_id and obj.encuesta_fija else ''
+
     class Meta:
-        fields = ('nombre', 'apellidos', 'codigo_ticket', 'DNI', 'premio__nombre', 'fecha_respuesta', 'tienda__nombre',)
         model = EncuestaFijaPremio
+        fields = (
+            'id',
+            'encuesta_fija_titulo',
+            'nombre',
+            'apellidos',
+            'codigo_ticket',
+            'DNI',
+            'premio_nombre',
+            'fecha_respuesta',
+            'tienda_nombre',
+        )
+        export_order = fields
 
 @admin.register(EncuestaFijaPremio)
 class EncuestaFijaPremioAdmin(ExportMixin, admin.ModelAdmin):
@@ -749,6 +772,10 @@ class EncuestaFijaPremioAdmin(ExportMixin, admin.ModelAdmin):
     # Añadir barra de búsqueda por los campos que desees
     search_fields = ('nombre', 'apellidos', 'codigo_ticket', 'DNI', 'premio__nombre')
     #list_editable = ('tienda',)
+
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        return queryset.select_related('encuesta_fija', 'premio', 'tienda')
 
 
 
