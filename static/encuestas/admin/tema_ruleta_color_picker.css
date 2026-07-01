@@ -181,16 +181,21 @@
     align-items: center;
     display: flex;
     gap: 10px;
+    max-width: 520px;
 }
 
 .ruleta-theme-image-preview img {
     background: #f6f6f6;
     border: 1px solid #c8c8c8;
     border-radius: 4px;
-    height: 72px;
-    object-fit: contain;
+    box-sizing: border-box;
+    display: block;
+    height: 72px !important;
+    max-height: 72px !important;
+    max-width: 180px !important;
+    object-fit: contain !important;
     padding: 4px;
-    width: 180px;
+    width: 180px !important;
 }
 
 .ruleta-theme-image-preview span {
@@ -254,6 +259,8 @@
     box-sizing: border-box;
     display: grid;
     gap: 8px;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    height: 420px;
     left: 8px;
     max-height: 420px;
     overflow: hidden;
@@ -276,8 +283,8 @@
 .ruleta-image-options {
     display: grid;
     gap: 6px;
-    max-height: calc(100% - 42px);
-    min-height: 160px;
+    max-height: none;
+    min-height: 0;
     overflow-y: auto;
     padding-right: 2px;
 }

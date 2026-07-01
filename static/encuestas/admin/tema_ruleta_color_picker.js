@@ -495,7 +495,7 @@
         panel.style.left = left + 'px';
         panel.style.top = top + 'px';
         panel.style.width = panelWidth + 'px';
-        panel.style.maxHeight = panelHeight + 'px';
+        panel.style.height = panelHeight + 'px';
     }
 
     function setSelectedImage(select, picker, value) {

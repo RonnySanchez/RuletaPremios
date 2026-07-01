@@ -246,7 +246,7 @@ class TemaRuletaAdmin(admin.ModelAdmin):
         image_field = getattr(obj, field_name, None)
         if image_field and image_field.name:
             return format_html(
-                '<div class="ruleta-theme-image-preview"><img src="{}" alt=""><span>{}</span></div>',
+                '<div class="ruleta-theme-image-preview"><img src="{}" alt="" style="width:180px;max-width:180px;height:72px;max-height:72px;object-fit:contain;background:#f6f6f6;border:1px solid #c8c8c8;border-radius:4px;padding:4px;box-sizing:border-box;"><span>{}</span></div>',
                 TemaRuleta.image_url(image_field),
                 image_field.name
             )
