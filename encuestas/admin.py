@@ -11,6 +11,7 @@ from .models import Encuesta, TicketConsulta, Pregunta, Opcion, PreguntaOpcion, 
 from import_export import resources, fields
 from import_export.widgets import ForeignKeyWidget
 from import_export.admin import ExportMixin, ImportExportModelAdmin
+from import_export.forms import ImportForm, ConfirmImportForm
 
 
 TEMA_RULETA_COLOR_FIELDS = (
@@ -401,6 +402,28 @@ class TiendaPremioInline(admin.TabularInline):
     sortable_field_name = "orden"
 
 
+class TiendaPremioImportForm(ImportForm):
+    MODO_ACTUALIZAR = 'update'
+    MODO_REEMPLAZAR = 'replace'
+    IMPORT_MODE_CHOICES = (
+        (MODO_ACTUALIZAR, 'Actualizar stock'),
+        (MODO_REEMPLAZAR, 'Reemplazar stock por tienda'),
+    )
+
+    import_mode = forms.ChoiceField(
+        label='Modo de importación',
+        choices=IMPORT_MODE_CHOICES,
+        initial=MODO_ACTUALIZAR,
+        help_text='Actualizar crea o modifica filas del archivo. Reemplazar borra el stock actual de las tiendas del archivo y luego carga exactamente ese contenido.'
+    )
+
+    field_order = ["resource", "import_file", "format", "import_mode"]
+
+
+class TiendaPremioConfirmImportForm(ConfirmImportForm):
+    import_mode = forms.CharField(widget=forms.HiddenInput())
+
+
 class TiendaPremioResource(resources.ModelResource):
     # Traducimos el nombre de la tienda del Excel al objeto Tienda real
     tienda = fields.Field(
@@ -422,6 +445,29 @@ class TiendaPremioResource(resources.ModelResource):
         # Incluimos todos tus campos personalizados
         fields = ('id', 'tienda', 'premio', 'cantidad', 'monto_minimo_premio', 'fecha_activacion', 'visible', 'orden')
         skip_unchanged = True
+
+    def before_import(self, dataset, **kwargs):
+        import_mode = kwargs.get('import_mode', TiendaPremioImportForm.MODO_ACTUALIZAR)
+        is_confirm_step = kwargs.get('is_confirm_step', False)
+
+        if import_mode != TiendaPremioImportForm.MODO_REEMPLAZAR or not is_confirm_step:
+            return
+
+        if 'tienda__nombre' not in dataset.headers:
+            return
+
+        tienda_index = dataset.headers.index('tienda__nombre')
+        tiendas_en_archivo = {
+            _clean_import_text(row[tienda_index])
+            for row in dataset
+            if _clean_import_text(row[tienda_index])
+        }
+
+        if not tiendas_en_archivo:
+            return
+
+        tiendas_qs = Tienda.objects.filter(nombre__in=tiendas_en_archivo)
+        TiendaPremio.objects.filter(tienda__in=tiendas_qs).delete()
 
     # La función que intercepta los datos para inyectar el ID y actualizar el stock
     def before_import_row(self, row, **kwargs):
@@ -464,10 +510,34 @@ class TiendaPremioResource(resources.ModelResource):
 @admin.register(TiendaPremio)
 class TiendaPremioAdmin(ImportExportModelAdmin):
     resource_class = TiendaPremioResource
+    import_form_class = TiendaPremioImportForm
+    confirm_form_class = TiendaPremioConfirmImportForm
     list_display = ('tienda', 'premio', 'cantidad', 'monto_minimo_premio', 'fecha_activacion', 'visible')
     search_fields = ('tienda__nombre', 'premio__nombre')
     list_filter = ('tienda', 'premio', 'visible')
     list_editable = ('cantidad', 'visible') # Esto es muy útil para que cambies stock rápido sin entrar al detalle
+
+    def get_confirm_form_initial(self, request, import_form):
+        initial = super().get_confirm_form_initial(request, import_form)
+        if import_form is not None:
+            initial['import_mode'] = import_form.cleaned_data.get(
+                'import_mode',
+                TiendaPremioImportForm.MODO_ACTUALIZAR
+            )
+        return initial
+
+    def get_import_data_kwargs(self, **kwargs):
+        form = kwargs.get('form')
+        import_kwargs = super().get_import_data_kwargs(**kwargs)
+
+        if form:
+            import_kwargs['import_mode'] = form.cleaned_data.get(
+                'import_mode',
+                TiendaPremioImportForm.MODO_ACTUALIZAR
+            )
+            import_kwargs['is_confirm_step'] = isinstance(form, TiendaPremioConfirmImportForm)
+
+        return import_kwargs
 
 
 
