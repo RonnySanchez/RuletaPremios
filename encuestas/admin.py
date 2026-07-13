@@ -548,7 +548,15 @@ class PaisAdmin(admin.ModelAdmin):
 
 @admin.register(TicketConsulta)
 class TicketConsultaAdmin(admin.ModelAdmin):
-    list_display = ('tienda', 'codigo', 'monto')
+    list_display = (
+        'tienda',
+        'codigo',
+        'monto',
+        'encuesta_id_resuelta',
+        'status_respuesta',
+        'url_respuesta',
+        'creado_en',
+    )
     search_fields = ('codigo',)
     list_filter = ('tienda',)
 

@@ -84,6 +84,11 @@ class TicketConsulta(models.Model):
     tienda    = models.ForeignKey(Tienda, on_delete=models.CASCADE)
     codigo    = models.CharField(max_length=255)
     monto     = models.DecimalField(max_digits=10, decimal_places=2)
+    encuesta_id_resuelta = models.CharField(max_length=255, null=True, blank=True)
+    url_respuesta = models.TextField(null=True, blank=True)
+    status_respuesta = models.IntegerField(null=True, blank=True)
+    encabezado_respuesta = models.TextField(null=True, blank=True)
+    texto_respuesta = models.TextField(null=True, blank=True)
     creado_en = models.DateTimeField(auto_now_add=True)
 
 
