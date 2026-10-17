@@ -614,6 +614,12 @@ class EncuestaFija(models.Model):
         else:
             return Tienda.objects.none()  # No hay tiendas asignadas
 
+class TipoIdentificacionCliente(models.TextChoices):
+    DNI = 'DNI', 'DNI'
+    CE = 'CE', 'CE'
+    PASAPORTE = 'PASAPORTE', 'Pasaporte'
+
+
 class EncuestaFijaRespuesta(models.Model):
     encuesta_fija = models.ForeignKey(EncuestaFija, on_delete=models.CASCADE, related_name='respuestas')
     
@@ -624,7 +630,12 @@ class EncuestaFijaRespuesta(models.Model):
     codigo_ticket = models.CharField(max_length=255, null=True)
     fnac = models.DateField()
     correo = models.EmailField()
-    DNI = models.CharField(max_length=9)
+    tipo_identificacion = models.CharField(
+        max_length=10,
+        choices=TipoIdentificacionCliente.choices,
+        default=TipoIdentificacionCliente.DNI,
+    )
+    DNI = models.CharField(max_length=20, verbose_name='DNI/CE/Pasaporte')
     acepPolPriv = models.BooleanField()
     acepProm = models.BooleanField(null=True, blank=True)  # Este campo es opcional
     fecha_respuesta = models.DateField(default=date.today)
@@ -664,7 +675,12 @@ class EncuestaFijaPremio(models.Model):
     nombre = models.CharField(max_length=100)
     apellidos = models.CharField(max_length=100)
     codigo_ticket = models.CharField(max_length=255, null=True)
-    DNI = models.CharField(max_length=9)
+    tipo_identificacion = models.CharField(
+        max_length=10,
+        choices=TipoIdentificacionCliente.choices,
+        default=TipoIdentificacionCliente.DNI,
+    )
+    DNI = models.CharField(max_length=20, verbose_name='DNI/CE/Pasaporte')
     premio = models.ForeignKey(Premio, on_delete=models.CASCADE, related_name='premios_entregados')
     fecha_respuesta = models.DateField(default=date.today)
     tienda = models.ForeignKey(Tienda, on_delete=models.CASCADE, related_name='premios_entregados', null=True, blank=True)

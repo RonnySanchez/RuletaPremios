@@ -8,12 +8,13 @@ from django.http import HttpResponse, HttpResponseNotFound, JsonResponse
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 
-from cupones import models
 from cupones.models import Cupon
-from .models import Tienda, TicketConsulta, Encuesta, EncuestaPregunta, Respuesta, Opcion, TiendaPremio, TemaRuleta, EncuestaFija, EncuestaFijaRespuesta, EncuestaFijaPremio, Premio, TicketVentasEnLinea, transaction
+from cupones.services import emitir_cupon_para_premio
+from .models import Tienda, TicketConsulta, Encuesta, EncuestaPregunta, Respuesta, Opcion, TiendaPremio, TemaRuleta, EncuestaFija, EncuestaFijaRespuesta, EncuestaFijaPremio, Premio, TicketVentasEnLinea
 from .forms import EncuestaForm, EncuestaFijaForm, TicketForm
 from django.utils.html import format_html
 from django.db.models import F
+from django.db import transaction
 import json
 
 
@@ -111,7 +112,11 @@ def ejecutar_sorteo_ajax(request):
     try:
         tienda = Tienda.objects.get(id=tienda_id, activa=True)
         encuesta_fija = EncuestaFija.objects.get(id=encuesta_id)
-        respuesta = EncuestaFijaRespuesta.objects.get(codigo_ticket=codigo_ticket)
+        respuesta = EncuestaFijaRespuesta.objects.select_for_update().get(
+            codigo_ticket=codigo_ticket,
+            encuesta_fija=encuesta_fija,
+            tienda=tienda,
+        )
     except (Tienda.DoesNotExist, EncuestaFija.DoesNotExist, EncuestaFijaRespuesta.DoesNotExist):
         return JsonResponse({'error': 'Datos inválidos'}, status=400)
 
@@ -124,12 +129,19 @@ def ejecutar_sorteo_ajax(request):
     monto = ticket_consulta.monto if ticket_consulta else Decimal('0')
 
     # 3. Bloquear filas y calcular probabilidades (Evita concurrencia / premio congelado)
-    premios_qs = TiendaPremio.objects.select_for_update().filter(tienda=tienda, visible=True)
+    premios_qs = (
+        TiendaPremio.objects.select_for_update()
+        .filter(tienda=tienda, visible=True)
+        .select_related('premio', 'premio__plantilla_cupon')
+    )
     
     candidatos = []
     pesos = []
 
     for tp in premios_qs:
+        plantilla_cupon = getattr(tp.premio, 'plantilla_cupon', None)
+        if plantilla_cupon is not None and not plantilla_cupon.activo:
+            continue
         stock = tp.stock_disponible(monto)
         if stock > 0:
             candidatos.append(tp)
@@ -146,16 +158,32 @@ def ejecutar_sorteo_ajax(request):
     seleccionado.save()
 
     # 6. Registrar en EncuestaFijaPremio (Incluso si es "Suerte en la próxima", para que quede el historial)
-    EncuestaFijaPremio.objects.create(
+    premio_entregado = EncuestaFijaPremio.objects.create(
         encuesta_fija=encuesta_fija,
         respuesta=respuesta,
         nombre=respuesta.nombre,
         apellidos=respuesta.apellidos,
         codigo_ticket=codigo_ticket,
+        tipo_identificacion=respuesta.tipo_identificacion,
         DNI=respuesta.DNI,
         premio=seleccionado.premio,
         tienda=tienda,
     )
+    cupon = emitir_cupon_para_premio(premio_entregado)
+
+    datos_cupon = None
+    if cupon:
+        datos_cupon = {
+            'codigo': cupon.codigo,
+            'tipo': cupon.tipo,
+            'valor': str(cupon.valor),
+            'vencimiento': timezone.localtime(cupon.vencimiento).isoformat(),
+            'transferible': cupon.transferible,
+            'categorias': list(cupon.categorias.values_list('nombre', flat=True)),
+            'presentaciones': list(
+                cupon.presentaciones.values('nombre', 'codigo_efsystem')
+            ),
+        }
 
     # 7. Devolver el resultado al frontend
     return JsonResponse({
@@ -164,7 +192,8 @@ def ejecutar_sorteo_ajax(request):
         'nombre_premio': premio.nombre,
         'descripcion_premio': premio.descripcion or "", # Enviamos la descripción
         'imagen_url': premio.imagen.url if premio.imagen.name else None, # Enviamos la URL de la imagen
-        'es_premio_real': premio.es_premio
+        'es_premio_real': premio.es_premio,
+        'cupon': datos_cupon,
     })
 
 
@@ -497,6 +526,7 @@ def encuestafijaticket(request, tienda_id, encuesta_id, codigo_ticket):
                 codigo_ticket=form.cleaned_data['codigo_ticket'],
                 fnac=form.cleaned_data['fnac'],
                 correo=form.cleaned_data['correo'],
+                tipo_identificacion=form.cleaned_data['tipo_identificacion'],
                 DNI=form.cleaned_data['DNI'],
                 tienda = Tienda.objects.get(id=tienda_id),
                 acepPolPriv=form.cleaned_data['acepPolPriv'],

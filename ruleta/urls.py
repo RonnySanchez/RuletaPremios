@@ -13,6 +13,7 @@ urlpatterns = [
     path('politicas/', politicas, name='politicas'),
     path('polls/', include('encuestas.urls')),
     path('api/cupones/', include('cupones.urls')),
+    path('api/v2/cupones/', include('cupones.urls_v2')),
     path('api/', include('encuestas.api.urls')),
 ]
 

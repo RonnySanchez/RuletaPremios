@@ -774,7 +774,7 @@ class EncuestaFijaRespuestaResources(resources.ModelResource):
         # Actualizamos los campos a exportar
         fields = (
             'id', 'nombre', 'apellidos', 'telefono', 'codigo_ticket', 'fnac', 
-            'correo', 'DNI', 'acepPolPriv', 'acepProm', 'fecha_respuesta', 
+            'correo', 'tipo_identificacion', 'DNI', 'acepPolPriv', 'acepProm', 'fecha_respuesta',
             'tienda__nombre', 
             'valoracion_producto', 'valoracion_atencion', 
             'probabilidad_recomendacion', 'comentarios_adicionales',
@@ -835,6 +835,7 @@ class EncuestaFijaPremioResources(resources.ModelResource):
             'nombre',
             'apellidos',
             'codigo_ticket',
+            'tipo_identificacion',
             'DNI',
             'premio_nombre',
             'fecha_respuesta',
@@ -846,7 +847,7 @@ class EncuestaFijaPremioResources(resources.ModelResource):
 class EncuestaFijaPremioAdmin(ExportMixin, admin.ModelAdmin):
     resource_class = EncuestaFijaPremioResources
     # Campos que se mostrarán en la lista del panel administrativo
-    list_display = ('encuesta_fija', 'nombre', 'apellidos', 'codigo_ticket', 'DNI', 'premio', 'fecha_respuesta', 'tienda')
+    list_display = ('encuesta_fija', 'nombre', 'apellidos', 'codigo_ticket', 'tipo_identificacion', 'DNI', 'premio', 'fecha_respuesta', 'tienda')
     # Añadir barra de búsqueda por los campos que desees
     search_fields = ('encuesta_fija__titulo', 'nombre', 'apellidos', 'codigo_ticket', 'DNI', 'premio__nombre')
     list_filter = (
