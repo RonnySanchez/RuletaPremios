@@ -3,6 +3,8 @@ from django.urls import path, include
 from . import views
 
 urlpatterns = [
+    path('contacto/<uuid:token>/', views.contacto_cupon, name='contacto_cupon'),
+    path('cupon/<uuid:token>/', views.resultado_cupon, name='resultado_cupon'),
     path("", views.IndexView, name="index"),
     path("mensaje/",views.mensajeCorreo, name='mensaje'),
     path('<int:tienda_id>/<int:encuesta_id>/', views.polls, name='polls'),

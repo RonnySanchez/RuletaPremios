@@ -104,8 +104,40 @@ Premio entregado
                         <h1>{{ premio.premio }}</h1>
                         <span>{{ premio.premio.descripcion }}</span>
                         <h2>{{ premio.nombre }} {{ premio.apellidos }}</h2>
-                        <p>Identificación: {{ premio.DNI }}</p>
+                        {% if premio.DNI %}<p>Identificación: {{ premio.DNI }}</p>{% endif %}
                         <p>Ticket: {{ premio.codigo_ticket }}</p>
+                        {% if premio.cupon %}
+                            <hr>
+                            <h2>Código de cupón</h2>
+                            <p><strong style="font-size: 1.4rem;">{{ premio.cupon.codigo }}</strong></p>
+                            <p>
+                                Descuento:
+                                <strong>
+                                    {% if premio.cupon.tipo == 'PORCENTAJE' %}
+                                        {{ premio.cupon.valor }}%
+                                    {% else %}
+                                        S/ {{ premio.cupon.valor }}
+                                    {% endif %}
+                                </strong>
+                            </p>
+                            <p>Válido desde: {{ premio.cupon.inicio|date:"d/m/Y H:i" }}</p>
+                            <p>Válido hasta: {{ premio.cupon.vencimiento|date:"d/m/Y H:i" }}</p>
+                            <p>Uso único y no acumulable con otras promociones.</p>
+                            {% if premio.cupon.cantidad_maxima_productos %}<p>Máximo {{ premio.cupon.cantidad_maxima_productos }} unidad(es) por cupón.</p>{% endif %}
+                            {% if premio.cupon.presentaciones.exists %}
+                                <p>Presentaciones: {% for item in premio.cupon.presentaciones.all %}{{ item.nombre }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+                            {% endif %}
+                            {% if premio.cupon.categorias.exists %}
+                                <p>Categorías: {% for item in premio.cupon.categorias.all %}{{ item.nombre }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+                            {% endif %}
+                            <p>
+                                {% if premio.cupon.transferible %}
+                                    Cupón transferible.
+                                {% else %}
+                                    Cupón personal, válido con {{ premio.cupon.get_tipo_identificacion_display }} {{ premio.cupon.numero_identificacion }}.
+                                {% endif %}
+                            </p>
+                        {% endif %}
                         <!-- <p>Presenta el ticket de compra junto a este mensaje para reclamar el premio.</p> -->
 
 

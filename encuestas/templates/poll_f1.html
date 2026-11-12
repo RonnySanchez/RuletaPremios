@@ -4,24 +4,11 @@
 {% block header %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100..900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/ruleta.css' %}?v=20260701-ruleta-theme-aro">
+<link rel="stylesheet" href="{% static 'css/encuesta.css' %}?v=20261019-encuesta-theme">
+{% include 'includes/ruleta_tema_vars.html' %}
 <style>
-body {
-    background-color: #eeeeee;
-    /*background-image: url("{% static 'img/fondoruleta.png' %}");*/
-    background-repeat: repeat repeat;
-
-    text-align: start; 
-    transition-property: opacity, transform; 
-    font-family: 'Red Hat Display' !important; 
-    font-style: normal; 
-    font-stretch: normal; 
-    font-optical-sizing: auto; 
-    line-height: initial; 
-    opacity: 1; 
-    transition-duration: 350ms;
-}
-
 /* CSS para las valoraciones con estrellas */
 .star-rating {
     display: flex;
@@ -35,7 +22,7 @@ body {
 }
 .star-rating label {
     font-size: 2.5rem; /* Tamaño de las estrellas */
-    color: #ddd; /* Color de estrella inactiva */
+    color: var(--ef-muted-text);
     cursor: pointer;
     transition: color 0.2s;
     line-height: 1;
@@ -43,12 +30,11 @@ body {
 /* Efecto hover: colorea las estrellas al pasar el mouse */
 .star-rating label:hover,
 .star-rating label:hover ~ label {
-/*    color: #f5b301;*/
-    color: #003468;
+    color: var(--wheel-color-4);
 }
 /* Estilo para la estrella seleccionada y las anteriores */
 .star-rating input[type="radio"]:checked ~ label {
-    color: #003468;
+    color: var(--wheel-color-4);
 }
 
 
@@ -108,9 +94,8 @@ input[type="range"] {
 }
 
 .selected-icon {
-    border: 8px solid hsl(54, 97%, 58%);  /* Un borde más grueso */
+    border: 8px solid var(--wheel-color-4);
     border-radius: 50%;      /* Esto hace que el borde sea redondeado */
-    box-shadow: 0 0 10px rgba(247, 224, 174, 0.5); /* Añade una sombra para dar más énfasis */
     transition: border 0.3s ease; /* Transición suave para el cambio de borde */
 
 }
@@ -135,6 +120,8 @@ input[type="range"] {
 
 </style>    
 {% endblock  %}
+
+{% block body_class %}ruleta-theme ruleta-page encuesta-page{% endblock %}
 
 {% block title %}
     Polls
@@ -190,12 +177,10 @@ input[type="range"] {
 </div>
   
 
-<div class="container-fluid p-0">
+<div class="container-fluid p-0 encuesta-container">
     <form method="POST" id="myform">
-        <div class="p-3 text-center" style="background-color: #6b96b8;">
-            <br>
-            <img src="{% static 'images/Logo EF Blanco.svg' %}" class="img-fluid" alt="..." style="width: 30%;">
-            <br><br>
+        <div class="p-3 text-center encuesta-header">
+            <div class="ruleta-header-banner" role="img" aria-label="Promoción EF Perfumes"></div>
         </div>
 
         <div class="p-3">
@@ -252,8 +237,9 @@ input[type="range"] {
                     {{ form.correo }}
                 </div>
 
-                <div class="mb-3">
-                    {{ form.DNI }}
+                <div class="row mb-3">
+                    <div class="col-4">{{ form.tipo_identificacion }}</div>
+                    <div class="col-8">{{ form.DNI }}</div>
                     <span style="font-size: 60%;">{{ form.DNI.help_text }}</span>
                 </div>
 
@@ -291,7 +277,7 @@ input[type="range"] {
                 </div>
 
                 <div class="mb-3 text-center">
-                    <label for="id_comentarios_adicionales" class="label-ruleta" style="color: #003468;" >{{ form.comentarios_adicionales.label }}</label>
+                    <label for="id_comentarios_adicionales" class="label-ruleta">{{ form.comentarios_adicionales.label }}</label>
                     {{ form.comentarios_adicionales }}
                 </div>
 
@@ -305,12 +291,12 @@ input[type="range"] {
                     <div class="col-11"><span style="font-size: 10px;">{{ form.acepProm.label }}</span></div>
                 </div>
 
-                <p id="mensajeError" style="color: red; display: none;">Por favor, complete todas las valoraciones antes de enviar.</p>
+                <p id="mensajeError" class="encuesta-error" role="alert" style="display: none;">Por favor, complete todas las valoraciones antes de enviar.</p>
             </div>
         </div> 
         
         <div class="p-3 text-center">
-            <button type="submit" class="btn btn-primary" style="background-color: #6b96b8; color: white;">Enviar y Jugar</button>
+            <button type="submit" class="btn btn-primary">{% if premio_directo %}Recibir mi cupon{% else %}Enviar y Jugar{% endif %}</button>
         </div>
     </form>
     <br>

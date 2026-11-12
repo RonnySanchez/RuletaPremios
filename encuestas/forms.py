@@ -1,5 +1,5 @@
 from django import forms
-from .models import Pregunta, Respuesta, Opcion
+from .models import Pregunta, Respuesta, Opcion, TipoIdentificacionCliente
 from django.core.validators import RegexValidator
 from django.core.exceptions import ValidationError
 from datetime import date
@@ -71,13 +71,21 @@ class EncuestaFijaForm(forms.Form):
     )
 
     correo = forms.EmailField(label='Correo electrónico', required=True, widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Email'}))
+    tipo_identificacion = forms.ChoiceField(
+        label='Tipo de identificación',
+        choices=TipoIdentificacionCliente.choices,
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
     DNI = forms.CharField(
-        label='Número de identificación (DNI / CE)',
-        max_length=9,
-        min_length=8,
-        validators=[RegexValidator(regex=r'^\d{8,9}$', message="El número de identificación debe tener entre 8 y 9 dígitos.")],
-        help_text="Introduce un número de identificación de 8 a 9 dígitos", 
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nro. de identificación'})
+        label='DNI/CE/Pasaporte',
+        max_length=20,
+        min_length=6,
+        validators=[RegexValidator(
+            regex=r'^[A-Za-z0-9-]{6,20}$',
+            message="Usa entre 6 y 20 letras, números o guiones.",
+        )],
+        help_text="Ingresa tu DNI, CE o pasaporte",
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'DNI/CE/Pasaporte'})
     )
 
     # --- CAMPOS NUEVOS ---
@@ -124,10 +132,26 @@ class EncuestaFijaForm(forms.Form):
             raise ValidationError("Debes ser mayor de 18 años.")
         
         return fnac
+
+    def clean_DNI(self):
+        return self.cleaned_data['DNI'].strip().upper()
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         # Hacer que el campo 'codigo_ticket' sea de solo lectura
         self.fields['codigo_ticket'].widget.attrs['readonly'] = True
+
+
+class ContactoCuponForm(forms.Form):
+    nombre = forms.CharField(label='Nombres', max_length=100, widget=forms.TextInput(attrs={'class': 'form-control', 'autocomplete': 'given-name'}))
+    apellidos = forms.CharField(label='Apellidos', max_length=100, widget=forms.TextInput(attrs={'class': 'form-control', 'autocomplete': 'family-name'}))
+    telefono = forms.CharField(
+        label='Teléfono celular', min_length=9, max_length=9,
+        validators=[RegexValidator(r'^\d{9}$', 'Ingresa un celular de 9 dígitos.')],
+        widget=forms.TextInput(attrs={'class': 'form-control', 'autocomplete': 'tel', 'inputmode': 'numeric'}),
+    )
+    correo = forms.EmailField(label='Correo electrónico', widget=forms.EmailInput(attrs={'class': 'form-control', 'autocomplete': 'email'}))
+    acepPolPriv = forms.BooleanField(label='Acepto los términos y condiciones y la política de privacidad de esta promoción.')
+    acepProm = forms.BooleanField(label='Acepto recibir comunicaciones de promociones, ofertas y publicidad de la marca.', required=False)
     

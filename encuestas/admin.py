@@ -8,6 +8,7 @@ from django import forms
 from django.utils.html import format_html, mark_safe
 from django.urls import reverse
 from .models import Encuesta, TicketConsulta, Pregunta, Opcion, PreguntaOpcion, EncuestaPregunta, Respuesta, TicketVentasEnLinea, Tienda, Pais, Region, Premio, Tienda, TiendaPremio, FormularioEncFija, TemaRuleta, EncuestaFija, EncuestaFijaRespuesta, EncuestaFijaPremio
+from .models import ParticipacionCuponDirecto
 from import_export import resources, fields
 from import_export.widgets import ForeignKeyWidget
 from import_export.admin import ExportMixin, ImportExportModelAdmin
@@ -721,21 +722,47 @@ class RespuestaAdmin(admin.ModelAdmin):
 
 @admin.register(FormularioEncFija)
 class FormularioEncFijaAdmin(admin.ModelAdmin):
-    list_display = ('nombre',)
+    list_display = ('nombre', 'codigo')
+    list_filter = ('codigo',)
     search_fields = ('nombre',)
+
+
+@admin.register(ParticipacionCuponDirecto)
+class ParticipacionCuponDirectoAdmin(admin.ModelAdmin):
+    list_display = ('encuesta_fija', 'tienda', 'codigo_ticket', 'premio_entregado', 'creado_en')
+    list_filter = ('encuesta_fija', 'tienda')
+    search_fields = ('codigo_ticket', 'premio_entregado__cupon__codigo')
+    readonly_fields = ('encuesta_fija', 'tienda', 'codigo_ticket', 'premio_entregado', 'creado_en')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(EncuestaFija)
 class EncuestaFijaAdmin(admin.ModelAdmin):
-    list_display = ('titulo', 'descripcion', 'activa', 'tipo_juego', 'tema_ruleta')
+    list_display = ('titulo', 'descripcion', 'activa', 'tipo_juego', 'premio_directo', 'inicio_campana', 'fin_campana', 'tema_ruleta')
     search_fields = ('titulo',)
     list_filter = ('activa', 'tipo_juego', 'tema_ruleta')
     readonly_fields = ['tiendas_asignadas_enlaces_fijas',]
     filter_horizontal = ('tiendas',)
+    fieldsets = (
+        ('Campana', {'fields': ('titulo', 'descripcion', 'activa', 'encuestafija')}),
+        ('Participacion', {'fields': ('inicio_campana', 'fin_campana', 'tiendas', 'region', 'pais', 'tiendas_asignadas_enlaces_fijas')}),
+        ('Resultado', {'fields': ('tipo_juego', 'premio_directo', 'tema_ruleta')}),
+        ('Ticket', {'fields': ('encabezado', 'texto')}),
+    )
     def tiendas_asignadas_enlaces_fijas(self, obj):
         """
         Retorna una lista de enlaces a la encuesta para cada tienda asignada.
         """
+        if obj.tipo_juego == EncuestaFija.TipoJuego.DIRECTO:
+            return 'El enlace individual se genera al registrar el ticket mediante la API de EFSystem.'
         tiendas = obj.get_tiendas_asignadas()
         if not tiendas.exists():
             return "No hay tiendas asignadas."
@@ -774,7 +801,7 @@ class EncuestaFijaRespuestaResources(resources.ModelResource):
         # Actualizamos los campos a exportar
         fields = (
             'id', 'nombre', 'apellidos', 'telefono', 'codigo_ticket', 'fnac', 
-            'correo', 'DNI', 'acepPolPriv', 'acepProm', 'fecha_respuesta', 
+            'correo', 'tipo_identificacion', 'DNI', 'acepPolPriv', 'acepProm', 'fecha_respuesta',
             'tienda__nombre', 
             'valoracion_producto', 'valoracion_atencion', 
             'probabilidad_recomendacion', 'comentarios_adicionales',
@@ -835,6 +862,7 @@ class EncuestaFijaPremioResources(resources.ModelResource):
             'nombre',
             'apellidos',
             'codigo_ticket',
+            'tipo_identificacion',
             'DNI',
             'premio_nombre',
             'fecha_respuesta',
@@ -846,7 +874,7 @@ class EncuestaFijaPremioResources(resources.ModelResource):
 class EncuestaFijaPremioAdmin(ExportMixin, admin.ModelAdmin):
     resource_class = EncuestaFijaPremioResources
     # Campos que se mostrarán en la lista del panel administrativo
-    list_display = ('encuesta_fija', 'nombre', 'apellidos', 'codigo_ticket', 'DNI', 'premio', 'fecha_respuesta', 'tienda')
+    list_display = ('encuesta_fija', 'nombre', 'apellidos', 'codigo_ticket', 'tipo_identificacion', 'DNI', 'premio', 'fecha_respuesta', 'tienda')
     # Añadir barra de búsqueda por los campos que desees
     search_fields = ('encuesta_fija__titulo', 'nombre', 'apellidos', 'codigo_ticket', 'DNI', 'premio__nombre')
     list_filter = (
