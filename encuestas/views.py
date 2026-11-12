@@ -7,11 +7,14 @@ from django.core.serializers import serialize
 from django.http import HttpResponse, HttpResponseNotFound, JsonResponse
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
+from django.views.decorators.http import require_http_methods, require_GET
 
 from cupones.models import Cupon
 from cupones.services import emitir_cupon_para_premio
 from .models import Tienda, TicketConsulta, Encuesta, EncuestaPregunta, Respuesta, Opcion, TiendaPremio, TemaRuleta, EncuestaFija, EncuestaFijaRespuesta, EncuestaFijaPremio, Premio, TicketVentasEnLinea
-from .forms import EncuestaForm, EncuestaFijaForm, TicketForm
+from .forms import EncuestaForm, EncuestaFijaForm, TicketForm, ContactoCuponForm
+from .services import entregar_premio_directo, validar_participacion
 from django.utils.html import format_html
 from django.db.models import F
 from django.db import transaction
@@ -38,6 +41,13 @@ def _ruleta_theme_vars(encuesta_fija=None):
     if encuesta_fija:
         return encuesta_fija.obtener_tema_ruleta_vars()
     return TemaRuleta.default_css_variables()
+
+
+def _render_aviso(request, encuesta_fija, context, status=200):
+    return render(request, 'RespEmitida.html', {
+        **context,
+        'ruleta_theme_vars': _ruleta_theme_vars(encuesta_fija),
+    }, status=status)
 
 
 def _stock_simulado(tienda_premio, monto, fecha_referencia):
@@ -112,6 +122,8 @@ def ejecutar_sorteo_ajax(request):
     try:
         tienda = Tienda.objects.get(id=tienda_id, activa=True)
         encuesta_fija = EncuestaFija.objects.get(id=encuesta_id)
+        if encuesta_fija.tipo_juego == EncuestaFija.TipoJuego.DIRECTO:
+            return JsonResponse({'error': 'Esta campana no admite sorteos.'}, status=400)
         respuesta = EncuestaFijaRespuesta.objects.select_for_update().get(
             codigo_ticket=codigo_ticket,
             encuesta_fija=encuesta_fija,
@@ -226,7 +238,7 @@ def consultaEncuestaFijaTiendaApi(request, tienda_id):
 
 
 def manejo_404(request, exception):
-    return render(request, "404.html", {})
+    return render(request, "404.html", {}, status=404)
 
 def politicas(request):
     return render(request, "politicas.html")
@@ -312,20 +324,22 @@ def ruleta(request, encuesta_id, tienda_id, codigo_ticket):
     # 1. Validaciones iniciales de IDs de sistema
     tienda = get_object_or_404(Tienda, id=tienda_id, activa=True)
     encuesta_fija = get_object_or_404(EncuestaFija, id=encuesta_id)
+    if encuesta_fija.tipo_juego == EncuestaFija.TipoJuego.DIRECTO:
+        return _render_aviso(request, encuesta_fija, {'error': 'Esta campana entrega un cupon directo. Abre el enlace original de tu ticket.'})
     
     # 2. ESCUDO ANTI-404: Validar si el ticket existe en las respuestas
     try:
         respuestas = EncuestaFijaRespuesta.objects.get(codigo_ticket=codigo_ticket)
     except EncuestaFijaRespuesta.DoesNotExist:
         # En lugar de crash 404, mostramos error amigable
-        return render(request, 'RespEmitida.html', {
+        return _render_aviso(request, encuesta_fija, {
             'error': "Ticket inválido o no encontrado.",
             'texto': "Por favor, completa la encuesta primero para participar."
         })
 
     # 3. Verificar si el usuario ya jugó (Evitar doble premio)
     if EncuestaFijaPremio.objects.filter(codigo_ticket=codigo_ticket, encuesta_fija=encuesta_fija).exists():
-        return render(request, 'RespEmitida.html', {
+        return _render_aviso(request, encuesta_fija, {
             'error': "Ya se ha entregado un premio con este código de ticket.",
             'texto': "Gracias por tu participación"
         })
@@ -348,7 +362,7 @@ def ruleta(request, encuesta_id, tienda_id, codigo_ticket):
     )
 
     if not hay_stock_sorteable:
-        return render(request, 'RespEmitida.html', {
+        return _render_aviso(request, encuesta_fija, {
             'error': "No hay premios disponibles en este momento.",
             'texto': "Gracias por tu participación"
         })
@@ -381,7 +395,7 @@ def pideticket(request, encuesta_id, tienda_id):
     # Validar que la tienda esté asignada a la encuesta
     tiendas_asignadas = encuesta_fija.get_tiendas_asignadas()
     if not tiendas_asignadas.filter(id=tienda.id).exists():
-        return render(request, 'RespEmitida.html', {
+        return _render_aviso(request, encuesta_fija, {
             'error': "! No hay sorteos en esta tienda !.",
             'texto': "Gracias por tu participación"
         })
@@ -415,18 +429,20 @@ def pideticket(request, encuesta_id, tienda_id):
 def encuestafijaticket(request, tienda_id, encuesta_id, codigo_ticket):
     encuesta_fija = get_object_or_404(EncuestaFija, id=encuesta_id, activa=True)
     tienda = get_object_or_404(Tienda, id=tienda_id, activa=True)
+    if encuesta_fija.tipo_juego == EncuestaFija.TipoJuego.DIRECTO:
+        return _render_aviso(request, encuesta_fija, {'error': 'Para recibir tu cupon abre el enlace original de tu ticket de compra.'})
 
     # 1. Validar tienda asignada
     t_asignadas = encuesta_fija.get_tiendas_asignadas()
     if not t_asignadas.filter(id=tienda.id).exists():
-        return render(request, 'RespEmitida.html', {
+        return _render_aviso(request, encuesta_fija, {
                 'error': "! No hay sorteos en esta tienda !.",
                 'texto': "Gracias por tu participación"
             })
 
     # 2. Verificar stock general
     if tienda.premios_stock() <= 0:
-        return render(request, 'RespEmitida.html', {
+        return _render_aviso(request, encuesta_fija, {
             'error': "No hay premios disponibles en este momento.",
             'texto': "Gracias por tu participación"
     })
@@ -439,7 +455,7 @@ def encuestafijaticket(request, tienda_id, encuesta_id, codigo_ticket):
 
         # Si no aparece en NINGUNA de las dos tablas, el ticket es inválido
         if not t_v_linea and not t_consulta:
-            return render(request, 'RespEmitida.html', {
+            return _render_aviso(request, encuesta_fija, {
                 'error': "El código de ticket ingresado no es válido para esta tienda.",
                 'texto': "Gracias por tu participación"
             })
@@ -461,13 +477,13 @@ def encuestafijaticket(request, tienda_id, encuesta_id, codigo_ticket):
                     else:
                         errorprem = f"Este ticket ya participó en la Ruleta en<br><h3>{tiendaprem}</h3>Cliente <br><h3>{nombreprem} {apellidosprem}</h3><h3>({idnombre})</h3>Resultado: <h3>{prem}</h3><br>Este ticket no obtuvo premio físico.<br>"
                     
-                    return render(request, 'RespEmitida.html', { 'error': errorprem, 'texto': "¡Gracias por participar!" })
+                    return _render_aviso(request, encuesta_fija, { 'error': errorprem, 'texto': "¡Gracias por participar!" })
                 
                 except EncuestaFijaPremio.DoesNotExist:
                     return redirect('ruleta', encuesta_id=encuesta_id, tienda_id=tienda.id, codigo_ticket=codigo_ticket)
             
             if t_v_linea.esta_vencido():
-                return render(request, 'RespEmitida.html', {
+                return _render_aviso(request, encuesta_fija, {
                     'error': "Lo sentimos, este código de ticket ha expirado.",
                     'texto': "¡Gracias por participar!"
                 })
@@ -495,7 +511,7 @@ def encuestafijaticket(request, tienda_id, encuesta_id, codigo_ticket):
                 else:
                     errorprem = f"Este ticket ya participó en la Ruleta en<br><h3>{tiendaprem}</h3>Cliente <br><h3>{nombreprem} {apellidosprem}</h3><h3>({idnombre})</h3>Resultado: <h3>Tu ticket no obtuvo un premio en esta oportunidad.</h3><br>"
 
-                return render(request, 'RespEmitida.html', {
+                return _render_aviso(request, encuesta_fija, {
                     'error': errorprem,
                     'texto': "¡Gracias por participar en nuestra Ruleta de Premios!"
                 })
@@ -513,7 +529,7 @@ def encuestafijaticket(request, tienda_id, encuesta_id, codigo_ticket):
             codigo_ticket_form = form.cleaned_data['codigo_ticket']
             
             if EncuestaFijaRespuesta.objects.filter(codigo_ticket=codigo_ticket_form, encuesta_fija=encuesta_fija).exists():
-                return render(request, 'RespEmitida.html', {
+                return _render_aviso(request, encuesta_fija, {
                     'error': "Ya se ha enviado una respuesta..",
                     'texto': "Gracias por tu participación"
                 })            
@@ -558,9 +574,63 @@ def encuestafijaticket(request, tienda_id, encuesta_id, codigo_ticket):
         'form': form,
         'calificacion': 0,
         'codigo_ticket': codigo_ticket,
+        'ruleta_theme_vars': _ruleta_theme_vars(encuesta_fija),
     }
 
     return render(request, plantilla, context)
+
+
+@require_http_methods(['GET', 'POST'])
+def contacto_cupon(request, token):
+    ticket = get_object_or_404(TicketConsulta.objects.select_related('tienda'), token_participacion=token)
+    campana = get_object_or_404(
+        EncuestaFija.objects.select_related('encuestafija', 'premio_directo', 'premio_directo__plantilla_cupon', 'tema_ruleta'),
+        pk=ticket.encuesta_id_resuelta, tipo_juego=EncuestaFija.TipoJuego.DIRECTO,
+    )
+    existente = EncuestaFijaPremio.objects.filter(
+        encuesta_fija=campana, tienda=ticket.tienda, codigo_ticket=ticket.codigo,
+    ).first()
+    if existente and existente.token_resultado:
+        return redirect('resultado_cupon', token=existente.token_resultado)
+    try:
+        validar_participacion(campana, ticket.tienda, ticket)
+        campana.full_clean()
+    except ValidationError as exc:
+        return _render_aviso(request, campana, {'error': ' '.join(exc.messages)}, status=400)
+
+    form_class = ContactoCuponForm if campana.usa_form_contacto else EncuestaFijaForm
+    form = form_class(request.POST if request.method == 'POST' else None, initial={'codigo_ticket': ticket.codigo})
+    if request.method == 'POST' and form.is_valid():
+        try:
+            premio = entregar_premio_directo(campana, ticket.tienda, ticket, form.cleaned_data)
+        except ValidationError as exc:
+            form.add_error(None, ' '.join(exc.messages))
+        else:
+            return redirect('resultado_cupon', token=premio.token_resultado)
+    response = render(request, 'contacto_cupon.html' if campana.usa_form_contacto else 'poll_f1.html', {
+        'encuesta': campana, 'tienda': ticket.tienda, 'form': form,
+        'codigo_ticket': ticket.codigo, 'plantilla_cupon': campana.premio_directo.plantilla_cupon,
+        'premio_directo': True,
+        'ruleta_theme_vars': _ruleta_theme_vars(campana),
+    })
+    response['Cache-Control'] = 'private, no-store'
+    response['Referrer-Policy'] = 'same-origin'
+    return response
+
+
+@require_GET
+def resultado_cupon(request, token):
+    premio = get_object_or_404(
+        EncuestaFijaPremio.objects.select_related('cupon', 'premio', 'encuesta_fija__tema_ruleta'),
+        token_resultado=token,
+    )
+    response = render(request, 'resultado_cupon.html', {
+        'premio': premio, 'cupon': premio.cupon,
+        'ruleta_theme_vars': _ruleta_theme_vars(premio.encuesta_fija),
+    })
+    response['Cache-Control'] = 'private, no-store'
+    response['Referrer-Policy'] = 'no-referrer'
+    return response
 
 
 def guardar_premio(request):
@@ -578,10 +648,13 @@ def guardar_premio(request):
         entregado = EncuestaFijaPremio.objects.get(codigo_ticket=codigo_ticket)
     except EncuestaFijaPremio.DoesNotExist:
         # Si alguien intenta entrar a esta URL sin haber girado la ruleta
-        return render(request, 'RespEmitida.html', {
+        return _render_aviso(request, None, {
             'error': "No se encontró un registro de premio para este ticket.",
             'texto': "Por favor, asegúrate de completar el sorteo correctamente."
         })
+
+    if entregado.encuesta_fija.tipo_juego == EncuestaFija.TipoJuego.DIRECTO:
+        return _render_aviso(request, entregado.encuesta_fija, {'error': 'Consulta tu cupon desde el enlace original de tu ticket.'}, status=403)
 
     # 2. LOG DE VERIFICACIÓN (Opcional, para tus pruebas en consola)
     print(f"--- Mostrando Pantalla Final ---")
@@ -621,7 +694,7 @@ def vista_juego_regalos(request, encuesta_id, tienda_id, codigo_ticket):
                 codigo_ticket=codigo_ticket, encuesta_fija=encuesta_fija
             )
             # Si ya existe, mostrar un mensaje o redirigir
-            return render(request, 'RespEmitida.html', {
+            return _render_aviso(request, encuesta_fija, {
                 'error': "Ya se ha entregado un premio con este código de ticket.",
                 'texto': "Gracias por tu participación"
             })

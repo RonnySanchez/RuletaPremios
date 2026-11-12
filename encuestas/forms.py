@@ -141,4 +141,17 @@ class EncuestaFijaForm(forms.Form):
 
         # Hacer que el campo 'codigo_ticket' sea de solo lectura
         self.fields['codigo_ticket'].widget.attrs['readonly'] = True
+
+
+class ContactoCuponForm(forms.Form):
+    nombre = forms.CharField(label='Nombres', max_length=100, widget=forms.TextInput(attrs={'class': 'form-control', 'autocomplete': 'given-name'}))
+    apellidos = forms.CharField(label='Apellidos', max_length=100, widget=forms.TextInput(attrs={'class': 'form-control', 'autocomplete': 'family-name'}))
+    telefono = forms.CharField(
+        label='Teléfono celular', min_length=9, max_length=9,
+        validators=[RegexValidator(r'^\d{9}$', 'Ingresa un celular de 9 dígitos.')],
+        widget=forms.TextInput(attrs={'class': 'form-control', 'autocomplete': 'tel', 'inputmode': 'numeric'}),
+    )
+    correo = forms.EmailField(label='Correo electrónico', widget=forms.EmailInput(attrs={'class': 'form-control', 'autocomplete': 'email'}))
+    acepPolPriv = forms.BooleanField(label='Acepto los términos y condiciones y la política de privacidad de esta promoción.')
+    acepProm = forms.BooleanField(label='Acepto recibir comunicaciones de promociones, ofertas y publicidad de la marca.', required=False)
     

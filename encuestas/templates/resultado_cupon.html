@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Tu cupón | EF Perfumes{% endblock %}
+{% block header %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100..900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/ruleta.css' %}?v=20260701-ruleta-theme-aro">
+<link rel="stylesheet" href="{% static 'css/cupon_directo.css' %}?v=20261019-cupon-theme">
+{% include 'includes/ruleta_tema_vars.html' %}
+{% endblock %}
+{% block body_class %}ruleta-theme premio-page cupon-resultado-page{% endblock %}
+{% block content %}
+<main class="cupon-page">
+    <header class="cupon-brand">
+        <span>EF PERFUMES</span>
+        <div class="premio-header-banner" role="img" aria-label="Tu cupón EF Perfumes"></div>
+    </header>
+    <section class="cupon-content">
+        <p class="cupon-eyebrow">{{ premio.encuesta_fija.titulo }}</p>
+        <h1>Tu cupón está listo</h1>
+        <article class="cupon-ticket" aria-label="Cupón de descuento">
+            <p class="cupon-discount">{% if cupon.tipo == 'PORCENTAJE' %}{{ cupon.valor|floatformat:'-2' }}%{% else %}S/ {{ cupon.valor }}{% endif %}</p>
+            <p>de descuento</p>
+            <p class="cupon-code">{{ cupon.codigo }}</p>
+            <dl>
+                <dt>Válido desde</dt><dd>{{ cupon.inicio|date:'d/m/Y H:i' }}</dd>
+                <dt>Válido hasta</dt><dd>{{ cupon.vencimiento|date:'d/m/Y H:i' }}</dd>
+            </dl>
+            <p>{% if cupon.transferible %}Cupón transferible.{% else %}Cupón personal.{% endif %} Un único uso. No acumulable con otras promociones.</p>
+            {% if cupon.minimo_compra %}<p>Compra mínima: S/ {{ cupon.minimo_compra }}.</p>{% endif %}
+            {% if cupon.maximo_descuento %}<p>Descuento máximo: S/ {{ cupon.maximo_descuento }}.</p>{% endif %}
+            {% if cupon.categorias.exists %}<p>Categorías: {% for item in cupon.categorias.all %}{{ item.nombre }}{% if not forloop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
+            {% if cupon.presentaciones.exists %}<p>Presentaciones: {% for item in cupon.presentaciones.all %}{{ item.nombre }}{% if not forloop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
+            {% if cupon.cantidad_maxima_productos %}<p>Máximo {{ cupon.cantidad_maxima_productos }} unidad(es) por cupón.</p>{% endif %}
+        </article>
+        <p>Presenta este código en caja durante su periodo de validez.</p>
+    </section>
+</main>
+{% endblock %}

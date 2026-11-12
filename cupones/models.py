@@ -83,12 +83,17 @@ class PlantillaCuponPremio(models.Model):
         blank=True,
         verbose_name="Presentaciones aplicables",
     )
+    cantidad_maxima_productos = models.PositiveIntegerField(
+        null=True, blank=True, validators=[MinValueValidator(1)],
+        help_text='Unidades a las que se aplica el descuento. Vacio: sin limite.',
+    )
     tipo_vigencia = models.CharField(
         max_length=10,
         choices=TipoVigencia.choices,
         default=TipoVigencia.DIAS,
     )
     dias_vigencia = models.PositiveIntegerField(null=True, blank=True)
+    fecha_inicio_fija = models.DateField(null=True, blank=True)
     fecha_vencimiento_fija = models.DateField(null=True, blank=True)
     transferible = models.BooleanField(default=True)
     minimo_compra = models.DecimalField(
@@ -123,11 +128,15 @@ class PlantillaCuponPremio(models.Model):
         if self.tipo == TipoDescuento.MONTO and self.maximo_descuento is not None:
             errors["maximo_descuento"] = "El descuento maximo solo aplica a porcentajes."
         if self.tipo_vigencia == self.TipoVigencia.DIAS:
+            if self.fecha_inicio_fija:
+                errors['fecha_inicio_fija'] = 'Solo aplica a vigencia de fecha fija.'
             if not self.dias_vigencia:
                 errors["dias_vigencia"] = "Indica una cantidad de dias mayor que cero."
             if self.fecha_vencimiento_fija:
                 errors["fecha_vencimiento_fija"] = "No aplica para vigencia por dias."
         elif self.tipo_vigencia == self.TipoVigencia.FECHA_FIJA:
+            if self.fecha_inicio_fija and self.fecha_vencimiento_fija and self.fecha_inicio_fija > self.fecha_vencimiento_fija:
+                errors['fecha_inicio_fija'] = 'El inicio no puede ser posterior al vencimiento.'
             if not self.fecha_vencimiento_fija:
                 errors["fecha_vencimiento_fija"] = "Indica la fecha de vencimiento."
             elif self.fecha_vencimiento_fija < timezone.localdate():
@@ -180,6 +189,9 @@ class Cupon(models.Model):
         blank=True,
         verbose_name="Presentaciones aplicables",
     )
+    cantidad_maxima_productos = models.PositiveIntegerField(
+        null=True, blank=True, validators=[MinValueValidator(1)],
+    )
     plantilla_origen = models.ForeignKey(
         PlantillaCuponPremio,
         on_delete=models.SET_NULL,
@@ -203,6 +215,7 @@ class Cupon(models.Model):
     )
     numero_identificacion = models.CharField(max_length=20, null=True, blank=True)
     inicio = models.DateTimeField(default=timezone.now)
+    emitido_en = models.DateTimeField(default=timezone.now, editable=False)
     vencimiento = models.DateTimeField()
     minimo_compra = models.DecimalField(
         max_digits=10,
@@ -272,6 +285,8 @@ class UsoCupon(models.Model):
     monto_descuento = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     categoria = models.CharField(max_length=100, null=True, blank=True)
     presentacion_codigo = models.CharField(max_length=50, null=True, blank=True)
+    cantidad_productos = models.PositiveIntegerField(null=True, blank=True)
+    monto_aplicable = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     tipo_identificacion = models.CharField(max_length=10, null=True, blank=True)
     numero_identificacion = models.CharField(max_length=20, null=True, blank=True)
 

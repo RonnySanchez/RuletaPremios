@@ -29,6 +29,7 @@ class CuponSerializer(serializers.ModelSerializer):
             "valor",
             "categorias",
             "presentaciones",
+            "cantidad_maxima_productos",
             "minimo_compra",
             "maximo_descuento",
             "inicio",
@@ -55,6 +56,10 @@ class DatosValidacionCuponSerializer(serializers.Serializer):
     )
     categoria = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     presentacion_codigo = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    cantidad_productos = serializers.IntegerField(required=False, min_value=1)
+    monto_aplicable = serializers.DecimalField(
+        max_digits=10, decimal_places=2, min_value=Decimal('0.01'), required=False,
+    )
     tipo_identificacion = serializers.ChoiceField(
         choices=TipoIdentificacion.choices,
         required=False,
@@ -72,6 +77,9 @@ class DatosValidacionCuponSerializer(serializers.Serializer):
 class ConsumirCuponSerializer(DatosValidacionCuponSerializer):
     idempotency_key = serializers.CharField(max_length=100, required=True)
     nro_referencia = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    monto_descuento = serializers.DecimalField(
+        max_digits=10, decimal_places=2, min_value=Decimal("0"), required=False,
+    )
 
 
 class UsoCuponSerializer(serializers.ModelSerializer):
@@ -100,5 +108,8 @@ class UsoCuponRespuestaSerializer(serializers.ModelSerializer):
             "nro_referencia",
             "monto_total",
             "monto_descuento",
+            "cantidad_productos",
+            "monto_aplicable",
+            "presentacion_codigo",
             "fecha_uso",
         ]

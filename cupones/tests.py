@@ -1,13 +1,22 @@
-from datetime import date, datetime
+from concurrent.futures import ThreadPoolExecutor
+from datetime import date, datetime, timedelta
 from decimal import Decimal
+from threading import Barrier
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.test import SimpleTestCase, override_settings
+from django.db import connections
+from django.test import SimpleTestCase, TestCase, TransactionTestCase, override_settings, skipUnlessDBFeature
+from django.urls import reverse
 from django.utils import timezone
+from rest_framework.test import APIClient
+from rest_framework_simplejwt.tokens import AccessToken
 
-from .models import PlantillaCuponPremio, TipoDescuento
+from encuestas.models import Pais, Tienda
+
+from .models import Cupon, PlantillaCuponPremio, PresentacionCupon, TipoDescuento
 from .services import (
     calcular_descuento,
     calcular_vencimiento,
@@ -85,3 +94,164 @@ class CalculoDescuentoTests(SimpleTestCase):
         )
 
         self.assertEqual(calcular_descuento(cupon, Decimal("35")), Decimal("35.00"))
+
+
+class CuponAPIV2Tests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = get_user_model().objects.create_user(username="efsystem-v2")
+        pais = Pais.objects.create(nombre="Peru")
+        Tienda.objects.create(nombre="Tienda 03", pais=pais, id_efsystem=3)
+        Tienda.objects.create(nombre="Tienda 04", pais=pais, id_efsystem=4)
+        cls.cupon = Cupon.objects.create(
+            codigo="NAV30-PRUEBA", valor=30, cantidad_maxima_productos=1,
+            vencimiento=timezone.now() + timedelta(days=1),
+        )
+        cls.cupon.presentaciones.add(
+            PresentacionCupon.objects.create(nombre="Perfume 100 ml", codigo_efsystem="0100"),
+        )
+
+    def setUp(self):
+        self.api = APIClient()
+        self.api.credentials(HTTP_AUTHORIZATION=f"Bearer {AccessToken.for_user(self.usuario)}")
+        self.consultar = reverse("api_v2_consultar_cupon", args=[self.cupon.codigo.lower()])
+        self.validar = reverse("api_v2_validar_cupon")
+        self.usar = reverse("api_v2_usar_cupon")
+        self.datos = {
+            "codigo": self.cupon.codigo, "tienda": "3", "nro_referencia": "VENTA-01",
+            "monto_total": "220.00", "presentacion_codigo": "0100",
+            "cantidad_productos": 1, "monto_aplicable": "160.00", "idempotency_key": "CANJE-01",
+        }
+
+    def test_consulta_v2_conserva_estructura_y_no_consume(self):
+        respuesta = self.api.get(self.consultar)
+        self.assertEqual(respuesta.status_code, 200)
+        datos = respuesta.json()
+        anterior = self.api.get(reverse("api_consultar_cupon", args=[self.cupon.codigo]))
+        self.assertEqual(anterior.status_code, 200)
+        self.assertEqual(datos, anterior.json())
+        self.assertEqual(datos["codigo"], self.cupon.codigo)
+        self.assertEqual(datos["presentaciones"], [{"nombre": "Perfume 100 ml", "codigo_efsystem": "0100"}])
+        self.assertEqual(datos["cantidad_maxima_productos"], 1)
+        self.assertFalse(datos["requiere_identificacion"])
+        self.assertTrue(datos["is_active"])
+        self.assertEqual(datos["usos_actuales"], 0)
+        self.assertFalse(self.cupon.usos.exists())
+
+    def test_consulta_v2_devuelve_404_para_cupon_inexistente_o_agotado(self):
+        desconocido = reverse("api_v2_consultar_cupon", args=["NO-EXISTE"])
+        self.assertEqual(self.api.get(desconocido).status_code, 404)
+        self.assertEqual(self.api.post(self.usar, self.datos, format="json").status_code, 200)
+        self.assertEqual(self.api.get(self.consultar).status_code, 404)
+
+    def test_v2_requiere_autenticacion_en_las_tres_rutas(self):
+        anonimo = APIClient()
+        self.assertEqual(anonimo.get(self.consultar).status_code, 401)
+        for url in (self.validar, self.usar):
+            with self.subTest(url=url):
+                self.assertEqual(anonimo.post(url, self.datos, format="json").status_code, 401)
+
+    def test_validacion_y_canje_con_descuento_confirmado(self):
+        validacion = self.api.post(self.validar, self.datos, format="json")
+        self.assertEqual(validacion.status_code, 200)
+        self.assertEqual(validacion.json()["descuento_calculado"], "48.00")
+        self.assertFalse(self.cupon.usos.exists())
+        respuesta = self.api.post(self.usar, {**self.datos, "monto_descuento": "48.00"}, format="json")
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(set(respuesta.json()), {"mensaje", "datos_registrados"})
+        registro = respuesta.json()["datos_registrados"]
+        self.assertEqual(registro["nro_referencia"], "VENTA-01")
+        self.assertEqual(registro["monto_descuento"], "48.00")
+        self.assertEqual(registro["monto_aplicable"], "160.00")
+        self.assertEqual(registro["presentacion_codigo"], "0100")
+        self.assertEqual(self.cupon.usos.get().monto_descuento, Decimal("48.00"))
+
+    def test_descuento_distinto_no_consume_ni_reserva_la_clave(self):
+        respuesta = self.api.post(self.usar, {**self.datos, "monto_descuento": "66.00"}, format="json")
+        self.assertEqual(respuesta.status_code, 409)
+        self.assertEqual(respuesta.json()["descuento_calculado"], "48.00")
+        self.cupon.refresh_from_db()
+        self.assertEqual(self.cupon.usos_actuales, 0)
+        self.assertFalse(self.cupon.usos.exists())
+        self.assertEqual(self.api.post(self.usar, self.datos, format="json").status_code, 200)
+
+    def test_reintento_equivalente_devuelve_el_mismo_registro_incluso_vencido(self):
+        inicial = self.api.post(self.usar, self.datos, format="json")
+        self.assertEqual(inicial.status_code, 200)
+        reintento = {**self.datos, "codigo": self.cupon.codigo.lower(), "tienda": 3, "monto_descuento": "48"}
+        # El cupón y el JWT tienen vigencias independientes.
+        Cupon.objects.filter(pk=self.cupon.pk).update(vencimiento=timezone.now() - timedelta(seconds=1))
+        respuesta = self.api.post(self.usar, reintento, format="json")
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta.json(), inicial.json())
+        self.assertEqual(self.cupon.usos.count(), 1)
+
+    def test_misma_clave_con_datos_distintos_devuelve_conflicto(self):
+        self.assertEqual(self.api.post(self.usar, self.datos, format="json").status_code, 200)
+        cambios = {
+            "codigo": "OTRO-CUPON", "tienda": "4", "nro_referencia": "VENTA-02",
+            "monto_total": "221.00", "monto_aplicable": "159.00", "cantidad_productos": 2,
+            "presentacion_codigo": "0050", "categoria": "Otra",
+            "tipo_identificacion": "DNI", "numero_identificacion": "12345678",
+            "monto_descuento": "47.00",
+        }
+        for campo, valor in cambios.items():
+            with self.subTest(campo=campo):
+                respuesta = self.api.post(self.usar, {**self.datos, campo: valor}, format="json")
+                self.assertEqual(respuesta.status_code, 409)
+                self.assertNotIn("datos_registrados", respuesta.json())
+        self.cupon.refresh_from_db()
+        self.assertEqual(self.cupon.usos_actuales, 1)
+        self.assertEqual(self.cupon.usos.count(), 1)
+
+    def test_otra_credencial_no_puede_recuperar_un_canje_ajeno(self):
+        self.assertEqual(self.api.post(self.usar, self.datos, format="json").status_code, 200)
+        otro = get_user_model().objects.create_user(username="otra-credencial")
+        self.api.credentials(HTTP_AUTHORIZATION=f"Bearer {AccessToken.for_user(otro)}")
+        respuesta = self.api.post(self.usar, self.datos, format="json")
+        self.assertEqual(respuesta.status_code, 409)
+        self.assertNotIn("datos_registrados", respuesta.json())
+
+    def test_uso_anterior_conserva_sus_campos_y_no_pide_clave(self):
+        cupon = Cupon.objects.create(codigo="CUPON-ANTERIOR", valor=30, vencimiento=self.cupon.vencimiento)
+        datos = {
+            "codigo": cupon.codigo, "tienda": 3, "nro_referencia": "VENTA-ANTERIOR",
+            "monto_total": "100.00", "monto_descuento": "30.00",
+        }
+        respuesta = self.api.post(reverse("api_usar_cupon"), datos, format="json")
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(set(respuesta.json()), {"mensaje", "datos_registrados"})
+        self.assertEqual(respuesta.json()["datos_registrados"]["monto_descuento"], "30.00")
+        self.assertIsNone(cupon.usos.get().idempotency_key)
+
+
+class CanjeAPIV2ConcurrenteTests(TransactionTestCase):
+    @skipUnlessDBFeature("has_select_for_update")
+    def test_dos_cajas_no_pueden_canjear_el_mismo_cupon(self):
+        usuario = get_user_model().objects.create_user(username="cajas-v2")
+        pais = Pais.objects.create(nombre="Peru")
+        Tienda.objects.create(nombre="Tienda 03", pais=pais, id_efsystem=3)
+        cupon = Cupon.objects.create(
+            codigo="CANJE-CONCURRENTE", valor=30, vencimiento=timezone.now() + timedelta(days=1),
+        )
+        url = reverse("api_v2_usar_cupon")
+        barrera = Barrier(2)
+
+        def canjear(referencia):
+            try:
+                api = APIClient()
+                api.force_authenticate(usuario)
+                barrera.wait(timeout=10)
+                return api.post(url, {
+                    "codigo": cupon.codigo, "tienda": 3, "monto_total": "100.00",
+                    "nro_referencia": referencia, "idempotency_key": referencia,
+                }, format="json").status_code
+            finally:
+                connections.close_all()
+
+        with ThreadPoolExecutor(max_workers=2) as ejecutor:
+            futuros = [ejecutor.submit(canjear, referencia) for referencia in ("CAJA-1", "CAJA-2")]
+            self.assertCountEqual([futuro.result(timeout=20) for futuro in futuros], [200, 400])
+        cupon.refresh_from_db()
+        self.assertEqual(cupon.usos_actuales, 1)
+        self.assertEqual(cupon.usos.count(), 1)

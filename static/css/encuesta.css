@@ -1,0 +1,108 @@
+.encuesta-page .encuesta-container {
+    max-width: 500px;
+    color: var(--ef-text);
+    overflow-wrap: anywhere;
+}
+
+.encuesta-page .encuesta-header {
+    border-bottom: 1px solid var(--ef-muted-text);
+}
+
+.encuesta-page .form-control,
+.encuesta-page .form-control:focus {
+    background-color: var(--ef-card-soft);
+    border-color: var(--ef-muted-text);
+    color: var(--ef-text);
+    caret-color: var(--ef-text);
+    box-shadow: none;
+}
+
+.encuesta-page .form-control::placeholder {
+    color: var(--ef-muted-text);
+    opacity: 1;
+}
+
+.encuesta-page select option {
+    background-color: var(--ruleta-bg-color);
+    color: var(--ef-text);
+}
+
+.encuesta-page input[type="checkbox"],
+.encuesta-page input[type="range"] {
+    accent-color: var(--wheel-color-4);
+}
+
+.encuesta-page a,
+.aviso-page a {
+    color: var(--ef-text);
+    text-decoration: underline;
+}
+
+.encuesta-page .btn-primary,
+.encuesta-page .btn-secondary,
+.encuesta-page .alert-warning {
+    background-color: var(--ef-card-soft);
+    border-color: var(--ef-muted-text);
+    color: var(--ef-text);
+}
+
+.encuesta-page .alert-warning,
+.encuesta-page .encuesta-error {
+    border-left: 3px solid var(--wheel-color-5);
+}
+
+.encuesta-page .encuesta-error {
+    padding-left: 10px;
+}
+
+.encuesta-page .btn:hover {
+    text-decoration: underline;
+}
+
+.encuesta-page .modal-content {
+    background-color: var(--ruleta-bg-color);
+    color: var(--ef-text);
+    border-color: var(--ef-muted-text);
+    overflow-wrap: anywhere;
+}
+
+.encuesta-page .modal-header,
+.encuesta-page .modal-footer {
+    border-color: var(--ef-muted-text);
+}
+
+.encuesta-page .btn-close {
+    background: none;
+    color: var(--ef-text);
+    opacity: 1;
+}
+
+.encuesta-page .btn-close::before {
+    content: "\00d7";
+    font-size: 1.5rem;
+    line-height: 1;
+}
+
+.encuesta-page :is(.form-control, .btn, .btn-close, a, input[type="checkbox"]):focus-visible,
+.aviso-page a:focus-visible {
+    outline: 3px solid var(--wheel-color-4);
+    outline-offset: 3px;
+    box-shadow: none;
+}
+
+.aviso-content {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 28px 20px 56px;
+    color: var(--ef-text);
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+
+.aviso-mensaje {
+    padding-top: 28px;
+}
+
+.aviso-mensaje p:last-child {
+    color: var(--ef-muted-text);
+}

@@ -1,123 +1,26 @@
 {% extends 'base.html' %}
 {% load static %}
 
-
-{% block header %}  
-<style>
-    body {
-        background-color: #5e97bb !important;
-       /* background-image: url("{% static 'img/fondoruleta.png' %}");*/
-        background-repeat: repeat;
-        font-family: "Montserrat", sans-serif !important;
-        color: #eeeeee !important;
-    }
-
-    p {
-        margin-bottom: 0px !important;
-    }
-
-    .card {
-        /* Fondo blanco con un 80% de opacidad (20% de transparencia) */
-        background-color: rgba(0, 0, 0, 0) !important;
-        
-       /* background-color: none !important;*/
-    }
-
-    .card-borde-personalizado,
-    .card-borde-personalizado .card-header,
-    .card-borde-personalizado .card-footer {
-        border-color: none ; /* O el color que prefieras */
-        border: 0px solid rgba(0, 0, 0, .125) !important;
-        background-color: rgba(0, 0, 0, 0) !important;
-    }
-    
-    .label-ruleta {
-        font-size: 15px;
-        font-weight: 600; 
-    }
-    
-    .titulo-ruleta {
-        font-size: 20px;
-        font-weight: 600; 
-    }
-    
-    .header {
-        padding: 40px;
-        color: #fff;
-        margin: 0 auto;
-        margin-bottom: 40px;
-    }
-    
-    .header h1,p {
-        text-align: center;
-    }
-    
-    textarea {
-        background-color: rgba(20, 20, 20, 0.2);
-        caret-color: #fff;
-        resize: none;
-        color: #fff;
-    }
-    
-    .inputArea {
-        display: flex;
-        justify-content: center;
-        margin-top: 40px;
-    }
-    
-</style>
-
-
+{% block header %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100..900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/ruleta.css' %}?v=20260701-ruleta-theme-aro">
+<link rel="stylesheet" href="{% static 'css/encuesta.css' %}?v=20261019-encuesta-theme">
+{% include 'includes/ruleta_tema_vars.html' %}
 {% endblock %}
 
-
-{% block title %}
-Mensaje
-{% endblock title %}
-
+{% block body_class %}ruleta-theme sin-premio-page aviso-page{% endblock %}
+{% block title %}Mensaje{% endblock %}
 
 {% block content %}
-<title></title>
-
-
-
-<div class="container">
-    <div class="row mb-1">
-        <div class="col-1 col-md-3 themed-grid-col"></div>
-        <div class="col-10 col-md-6 themed-grid-col">
-            <div class="card card-borde-personalizado">
-                <form method="POST">
-                    <div class="card-header p-3 text-center">
-                        <br>
-                        <img src="{% static 'images/Logo EF Blanco.svg' %}" class="img-fluid" alt="..." style="width: 30%;">
-                    </div>
-                    <div class="card-body text-center" style="background-color: #5e97bb; color: #fff;">
-                        <p>{{ error|safe }}</p>
-                        <p>{{ texto }}</p>
-                    </div>
-                    <!-- Botón de envío -->
-                    <div class="card-footer text-center">
-
-                    </div>
-                </form>
-            </div>
-
-        </div>
-    </div>
-</div>
-<br>
-
-
-
-
-
-
-
-
-{% endblock content %}
-   
-
-{% block js_footer %}
-{% endblock  %}
+<main class="aviso-content">
+    <div class="ruleta-header-banner" role="img" aria-label="Promoción EF Perfumes"></div>
+    <section class="aviso-mensaje" role="status">
+        <div>{{ error|safe }}</div>
+        {% if texto %}<p>{{ texto }}</p>{% endif %}
+    </section>
+</main>
+{% endblock %}
 
 

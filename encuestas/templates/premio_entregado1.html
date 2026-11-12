@@ -104,7 +104,7 @@ Premio entregado
                         <h1>{{ premio.premio }}</h1>
                         <span>{{ premio.premio.descripcion }}</span>
                         <h2>{{ premio.nombre }} {{ premio.apellidos }}</h2>
-                        <p>Identificación: {{ premio.DNI }}</p>
+                        {% if premio.DNI %}<p>Identificación: {{ premio.DNI }}</p>{% endif %}
                         <p>Ticket: {{ premio.codigo_ticket }}</p>
                         {% if premio.cupon %}
                             <hr>
@@ -120,8 +120,10 @@ Premio entregado
                                     {% endif %}
                                 </strong>
                             </p>
+                            <p>Válido desde: {{ premio.cupon.inicio|date:"d/m/Y H:i" }}</p>
                             <p>Válido hasta: {{ premio.cupon.vencimiento|date:"d/m/Y H:i" }}</p>
                             <p>Uso único y no acumulable con otras promociones.</p>
+                            {% if premio.cupon.cantidad_maxima_productos %}<p>Máximo {{ premio.cupon.cantidad_maxima_productos }} unidad(es) por cupón.</p>{% endif %}
                             {% if premio.cupon.presentaciones.exists %}
                                 <p>Presentaciones: {% for item in premio.cupon.presentaciones.all %}{{ item.nombre }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
                             {% endif %}

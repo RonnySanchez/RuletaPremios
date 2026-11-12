@@ -47,10 +47,10 @@ class PlantillaCuponPremioAdmin(admin.ModelAdmin):
     fieldsets = (
         ("Premio", {"fields": ("premio", "activo")}),
         ("Beneficio", {"fields": ("tipo", "valor", "minimo_compra", "maximo_descuento")}),
-        ("Aplicabilidad", {"fields": ("categorias", "presentaciones", "transferible")}),
+        ("Aplicabilidad", {"fields": ("categorias", "presentaciones", "cantidad_maxima_productos", "transferible")}),
         (
             "Vigencia",
-            {"fields": ("tipo_vigencia", "dias_vigencia", "fecha_vencimiento_fija")},
+            {"fields": ("tipo_vigencia", "dias_vigencia", "fecha_inicio_fija", "fecha_vencimiento_fija")},
         ),
         ("Codigo", {"fields": ("formato_codigo",)}),
     )
@@ -66,6 +66,9 @@ class UsoCuponInline(admin.TabularInline):
         "nro_referencia",
         "monto_total",
         "monto_descuento",
+        "cantidad_productos",
+        "monto_aplicable",
+        "presentacion_codigo",
     )
     readonly_fields = fields
     extra = 0
@@ -96,17 +99,17 @@ class CuponAdmin(admin.ModelAdmin):
         "presentaciones__codigo_efsystem",
     )
     filter_horizontal = ("categorias", "presentaciones")
-    readonly_fields = ("usos_actuales", "plantilla_origen", "premio_ganado")
+    readonly_fields = ("usos_actuales", "plantilla_origen", "premio_ganado", "emitido_en")
     inlines = [UsoCuponInline]
     fieldsets = (
         ("Origen", {"fields": ("plantilla_origen", "premio_ganado")}),
-        ("Cupon", {"fields": ("codigo", "estatus", "categorias", "presentaciones")}),
+        ("Cupon", {"fields": ("codigo", "estatus", "categorias", "presentaciones", "cantidad_maxima_productos")}),
         ("Beneficio", {"fields": ("tipo", "valor", "minimo_compra", "maximo_descuento")}),
         (
             "Titular",
             {"fields": ("transferible", "tipo_identificacion", "numero_identificacion")},
         ),
-        ("Validez", {"fields": ("inicio", "vencimiento", "limite_usos", "usos_actuales")}),
+        ("Validez", {"fields": ("emitido_en", "inicio", "vencimiento", "limite_usos", "usos_actuales")}),
     )
 
     def get_changeform_initial_data(self, request):

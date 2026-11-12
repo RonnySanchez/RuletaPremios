@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}{{ encuesta.titulo }} | EF Perfumes{% endblock %}
+{% block header %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100..900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/ruleta.css' %}?v=20260701-ruleta-theme-aro">
+<link rel="stylesheet" href="{% static 'css/cupon_directo.css' %}?v=20261019-cupon-theme">
+{% include 'includes/ruleta_tema_vars.html' %}
+{% endblock %}
+{% block body_class %}ruleta-theme ruleta-page cupon-contacto-page{% endblock %}
+{% block content %}
+<main class="cupon-page">
+    <header class="cupon-brand">
+        <span>EF PERFUMES</span>
+        <div class="ruleta-header-banner" role="img" aria-label="Promoción EF Perfumes"></div>
+    </header>
+    <section class="cupon-content">
+        <h1>{{ encuesta.titulo }}</h1>
+        <p>{{ encuesta.descripcion|linebreaksbr }}</p>
+        <div class="cupon-beneficio">
+            <strong>{% if plantilla_cupon.tipo == 'PORCENTAJE' %}{{ plantilla_cupon.valor|floatformat:'-2' }}%{% else %}S/ {{ plantilla_cupon.valor }}{% endif %} de descuento</strong>
+            <span>{{ tienda.nombre }} · Ticket {{ codigo_ticket }}</span>
+        </div>
+        {% if plantilla_cupon.fecha_inicio_fija %}<p>Vigencia del cupón: del {{ plantilla_cupon.fecha_inicio_fija|date:'d/m/Y' }} al {{ plantilla_cupon.fecha_vencimiento_fija|date:'d/m/Y' }}.</p>{% endif %}
+        {% if plantilla_cupon.presentaciones.exists %}<p>Aplicable a: {% for item in plantilla_cupon.presentaciones.all %}{{ item.nombre }}{% if not forloop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
+        {% if plantilla_cupon.cantidad_maxima_productos %}<p>Máximo {{ plantilla_cupon.cantidad_maxima_productos }} unidad(es) por cupón.</p>{% endif %}
+        <form method="post" novalidate>
+            {% csrf_token %}
+            {% if form.non_field_errors %}<div class="cupon-error" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+            <div class="cupon-fields">
+                {% for field in form %}
+                    {% if field.name != 'acepPolPriv' and field.name != 'acepProm' %}
+                        <div class="cupon-field">
+                            {{ field.label_tag }}{{ field }}
+                            {% if field.errors %}<div class="cupon-error" role="alert">{{ field.errors }}</div>{% endif %}
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            <label class="cupon-consent">{{ form.acepPolPriv }}<span>{{ form.acepPolPriv.label }} <a href="{% url 'politicas' %}" target="_blank" rel="noopener noreferrer">Leer política de privacidad</a></span></label>
+            {% if form.acepPolPriv.errors %}<div class="cupon-error" role="alert">{{ form.acepPolPriv.errors }}</div>{% endif %}
+            <label class="cupon-consent">{{ form.acepProm }}<span>{{ form.acepProm.label }}</span></label>
+            <button type="submit" class="cupon-submit">Recibir mi cupón</button>
+        </form>
+    </section>
+</main>
+{% endblock %}

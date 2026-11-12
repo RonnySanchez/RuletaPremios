@@ -81,6 +81,7 @@ class Tienda(models.Model):
 
 
 class TicketConsulta(models.Model):
+    token_participacion = models.UUIDField(null=True, blank=True, unique=True, editable=False)
     tienda    = models.ForeignKey(Tienda, on_delete=models.CASCADE)
     codigo    = models.CharField(max_length=255)
     monto     = models.DecimalField(max_digits=10, decimal_places=2)
@@ -363,7 +364,12 @@ class TiendaPremio(models.Model):
         return seleccionado.premio
 
 class FormularioEncFija(models.Model):
+    class TipoFormulario(models.TextChoices):
+        RESENA = 'RESENA', 'Resena de experiencia'
+        CONTACTO_CUPON = 'CONTACTO_CUPON', 'Datos de contacto para cupon'
+
     nombre = models.CharField(max_length=100)
+    codigo = models.CharField(max_length=20, choices=TipoFormulario.choices, default=TipoFormulario.RESENA)
 
     class Meta:
         verbose_name = "Form Encuesta Fija"
@@ -532,10 +538,17 @@ class EncuestaFija(models.Model):
     class TipoJuego(models.TextChoices):
         RULETA = 'RULETA', 'Ruleta de Premios'
         CAJAS = 'CAJAS', 'Cajas de Regalos'
+        DIRECTO = 'DIRECTO', 'Premio directo'
 
     titulo = models.CharField(max_length=255)
     descripcion = models.TextField()
     activa = models.BooleanField(default=True)
+    inicio_campana = models.DateTimeField(null=True, blank=True, verbose_name='Inicio de participacion')
+    fin_campana = models.DateTimeField(null=True, blank=True, verbose_name='Fin de participacion')
+    premio_directo = models.ForeignKey(
+        Premio, on_delete=models.PROTECT, null=True, blank=True,
+        related_name='campanas_directas', verbose_name='Premio directo',
+    )
     encuestafija = models.ForeignKey(FormularioEncFija, on_delete=models.CASCADE, related_name='encuestasfijas', null=True, blank=True, verbose_name='Encuesta Fija' )
     tipo_juego = models.CharField(
         max_length=10,
@@ -567,33 +580,52 @@ class EncuestaFija(models.Model):
         if self.tema_ruleta_id and self.tema_ruleta:
             return self.tema_ruleta.css_variables()
         return TemaRuleta.default_css_variables()
+
+    @property
+    def usa_form_contacto(self):
+        return bool(self.encuestafija_id and self.encuestafija.codigo == FormularioEncFija.TipoFormulario.CONTACTO_CUPON)
+
+    def vigente_en(self, instante=None):
+        instante = instante or timezone.now()
+        return (
+            self.activa
+            and (not self.inicio_campana or self.inicio_campana <= instante)
+            and (not self.fin_campana or instante <= self.fin_campana)
+        )
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        if self.inicio_campana and self.fin_campana and self.inicio_campana >= self.fin_campana:
+            errors['fin_campana'] = 'El fin debe ser posterior al inicio.'
+        if self.usa_form_contacto and self.tipo_juego != self.TipoJuego.DIRECTO:
+            errors['tipo_juego'] = 'El formulario de contacto requiere premio directo.'
+        if self.tipo_juego == self.TipoJuego.DIRECTO and self.activa:
+            if not self.inicio_campana:
+                errors['inicio_campana'] = 'Indica el inicio de participacion.'
+            if not self.fin_campana:
+                errors['fin_campana'] = 'Indica el fin de participacion.'
+            if not self.premio_directo_id:
+                errors['premio_directo'] = 'Selecciona un premio con plantilla de cupon.'
+            else:
+                plantilla = getattr(self.premio_directo, 'plantilla_cupon', None)
+                if not self.premio_directo.es_premio or plantilla is None or not plantilla.activo:
+                    errors['premio_directo'] = 'El premio debe tener una plantilla de cupon activa.'
+                elif self.usa_form_contacto and not plantilla.transferible:
+                    errors['premio_directo'] = 'La encuesta de contacto requiere un cupon transferible.'
+        if errors:
+            raise ValidationError(errors)
     
     class Meta:
         verbose_name = "Encuesta Fija"
         verbose_name_plural = "Encuestas Fijas"
 
-    
- #   def save(self, *args, **kwargs):
- #       super().save(*args, **kwargs)
-
-        # Lógica de prioridad
- #       if self.tiendas.exists():
- #           self.region = None
- #           self.pais = None
- #       elif self.region:
- #           self.pais = None
- #       super().save(*args, **kwargs)
-
     def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        # Lógica de prioridad se ejecuta primero
-        if self.tiendas.exists():
+        if self.pk and self.tiendas.exists():
             self.region = None
             self.pais = None
         elif self.region:
             self.pais = None
-        
-        # Se guarda una sola vez con los datos ya corregidos
         super().save(*args, **kwargs)
 
 
@@ -628,14 +660,15 @@ class EncuestaFijaRespuesta(models.Model):
     apellidos = models.CharField(max_length=100)
     telefono = models.CharField(max_length=9)
     codigo_ticket = models.CharField(max_length=255, null=True)
-    fnac = models.DateField()
+    fnac = models.DateField(null=True, blank=True)
     correo = models.EmailField()
     tipo_identificacion = models.CharField(
         max_length=10,
         choices=TipoIdentificacionCliente.choices,
         default=TipoIdentificacionCliente.DNI,
+        blank=True,
     )
-    DNI = models.CharField(max_length=20, verbose_name='DNI/CE/Pasaporte')
+    DNI = models.CharField(max_length=20, blank=True, verbose_name='DNI/CE/Pasaporte')
     acepPolPriv = models.BooleanField()
     acepProm = models.BooleanField(null=True, blank=True)  # Este campo es opcional
     fecha_respuesta = models.DateField(default=date.today)
@@ -643,9 +676,9 @@ class EncuestaFijaRespuesta(models.Model):
     
     # --- CAMPOS NUEVOS ---
     # Las 3 preguntas de valoración con estrellas (1 a 5)
-    valoracion_producto = models.IntegerField(default=0, verbose_name="Valoración del producto")
-    valoracion_atencion = models.IntegerField(default=0, verbose_name="Valoración de la atención")
-    probabilidad_recomendacion = models.IntegerField(default=0, verbose_name="Probabilidad de recomendación")
+    valoracion_producto = models.IntegerField(default=0, null=True, blank=True, verbose_name="Valoración del producto")
+    valoracion_atencion = models.IntegerField(default=0, null=True, blank=True, verbose_name="Valoración de la atención")
+    probabilidad_recomendacion = models.IntegerField(default=0, null=True, blank=True, verbose_name="Probabilidad de recomendación")
     
     # Campo de texto para comentarios
     comentarios_adicionales = models.TextField(null=True, blank=True, verbose_name="Comentarios adicionales")
@@ -669,6 +702,7 @@ class EncuestaFijaRespuesta(models.Model):
 
 
 class EncuestaFijaPremio(models.Model):
+    token_resultado = models.UUIDField(null=True, blank=True, unique=True, editable=False)
     encuesta_fija = models.ForeignKey(EncuestaFija, on_delete=models.CASCADE, related_name='premios_entregados')
     respuesta = models.ForeignKey(EncuestaFijaRespuesta, on_delete=models.CASCADE, related_name='premios', null=True)
     # Datos personales del usuario
@@ -679,8 +713,9 @@ class EncuestaFijaPremio(models.Model):
         max_length=10,
         choices=TipoIdentificacionCliente.choices,
         default=TipoIdentificacionCliente.DNI,
+        blank=True,
     )
-    DNI = models.CharField(max_length=20, verbose_name='DNI/CE/Pasaporte')
+    DNI = models.CharField(max_length=20, blank=True, verbose_name='DNI/CE/Pasaporte')
     premio = models.ForeignKey(Premio, on_delete=models.CASCADE, related_name='premios_entregados')
     fecha_respuesta = models.DateField(default=date.today)
     tienda = models.ForeignKey(Tienda, on_delete=models.CASCADE, related_name='premios_entregados', null=True, blank=True)
@@ -690,6 +725,24 @@ class EncuestaFijaPremio(models.Model):
     class Meta:
         verbose_name = "Premio de Encuesta Fija"
         verbose_name_plural = "Premios de Encuesta Fija"
+
+
+class ParticipacionCuponDirecto(models.Model):
+    encuesta_fija = models.ForeignKey(EncuestaFija, on_delete=models.PROTECT, related_name='participaciones_directas')
+    tienda = models.ForeignKey(Tienda, on_delete=models.PROTECT, related_name='participaciones_directas')
+    codigo_ticket = models.CharField(max_length=255)
+    premio_entregado = models.OneToOneField(
+        EncuestaFijaPremio, on_delete=models.PROTECT, null=True, blank=True,
+        related_name='participacion_directa',
+    )
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Participacion de cupon directo'
+        verbose_name_plural = 'Participaciones de cupon directo'
+        constraints = [
+            models.UniqueConstraint(fields=['encuesta_fija', 'tienda', 'codigo_ticket'], name='participacion_directa_unica'),
+        ]
 
 
 

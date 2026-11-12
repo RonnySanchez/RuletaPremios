@@ -61,9 +61,16 @@ def calcular_vencimiento(plantilla, inicio=None):
     return vencimiento
 
 
-def calcular_descuento(cupon, monto_total):
+def calcular_inicio(plantilla, emision=None):
+    emision = emision or timezone.now()
+    if plantilla.tipo_vigencia == PlantillaCuponPremio.TipoVigencia.FECHA_FIJA and plantilla.fecha_inicio_fija:
+        return timezone.make_aware(datetime.combine(plantilla.fecha_inicio_fija, time.min))
+    return emision
+
+
+def calcular_descuento(cupon, monto_total, *, validar_minimo=True):
     monto_total = Decimal(monto_total)
-    if monto_total < cupon.minimo_compra:
+    if validar_minimo and monto_total < cupon.minimo_compra:
         raise ValidationError("La compra no alcanza el monto minimo requerido.")
 
     if cupon.tipo == TipoDescuento.PORCENTAJE:
@@ -82,6 +89,8 @@ def validar_restricciones_cupon(
     monto_total,
     categoria=None,
     presentacion_codigo=None,
+    cantidad_productos=None,
+    monto_aplicable=None,
     tipo_identificacion=None,
     numero_identificacion=None,
 ):
@@ -109,10 +118,24 @@ def validar_restricciones_cupon(
         if tipo_identificacion != cupon.tipo_identificacion:
             raise ValidationError("El tipo de identificacion no corresponde al titular del cupon.")
 
-    return calcular_descuento(cupon, monto_total)
+    monto_total = Decimal(monto_total)
+    if monto_total < cupon.minimo_compra:
+        raise ValidationError('La compra no alcanza el monto minimo requerido.')
+    if cupon.cantidad_maxima_productos is not None:
+        if cantidad_productos is None or cantidad_productos < 1 or cantidad_productos > cupon.cantidad_maxima_productos:
+            raise ValidationError(f'El cupon aplica como maximo a {cupon.cantidad_maxima_productos} unidad(es). Indica la cantidad de productos beneficiados.')
+        if monto_aplicable is None:
+            raise ValidationError('Indica el importe de los productos beneficiados, separado del total de la compra.')
+    base_descuento = monto_total if monto_aplicable is None else Decimal(monto_aplicable)
+    if not base_descuento.is_finite() or base_descuento <= 0 or base_descuento > monto_total:
+        raise ValidationError('El importe aplicable debe ser positivo y no superar el total de la compra.')
+    return calcular_descuento(cupon, base_descuento, validar_minimo=False)
 
 
 def emitir_cupon_para_premio(premio_ganado):
+    existente = Cupon.objects.filter(premio_ganado=premio_ganado).first()
+    if existente:
+        return existente
     try:
         plantilla = premio_ganado.premio.plantilla_cupon
     except PlantillaCuponPremio.DoesNotExist:
@@ -121,19 +144,24 @@ def emitir_cupon_para_premio(premio_ganado):
     if not plantilla.activo:
         raise ValidationError("La plantilla de cupon del premio esta inactiva.")
 
-    inicio = timezone.now()
-    vencimiento = calcular_vencimiento(plantilla, inicio)
+    emision = timezone.now()
+    inicio = calcular_inicio(plantilla, emision)
+    vencimiento = calcular_vencimiento(plantilla, emision)
+    if inicio >= vencimiento:
+        raise ValidationError('El inicio del cupon debe ser anterior al vencimiento.')
     respuesta = premio_ganado.respuesta
 
     for _ in range(MAX_INTENTOS_CODIGO):
-        codigo = renderizar_codigo(plantilla.formato_codigo, premio_ganado.tienda, inicio)
+        codigo = renderizar_codigo(plantilla.formato_codigo, premio_ganado.tienda, emision)
         try:
             with transaction.atomic():
                 cupon = Cupon.objects.create(
                     codigo=codigo,
                     tipo=plantilla.tipo,
                     valor=plantilla.valor,
+                    cantidad_maxima_productos=plantilla.cantidad_maxima_productos,
                     inicio=inicio,
+                    emitido_en=emision,
                     vencimiento=vencimiento,
                     minimo_compra=plantilla.minimo_compra,
                     maximo_descuento=plantilla.maximo_descuento,
@@ -150,6 +178,9 @@ def emitir_cupon_para_premio(premio_ganado):
                 cupon.presentaciones.set(plantilla.presentaciones.all())
                 return cupon
         except IntegrityError:
+            existente = Cupon.objects.filter(premio_ganado=premio_ganado).first()
+            if existente:
+                return existente
             if Cupon.objects.filter(codigo=codigo).exists():
                 continue
             raise
