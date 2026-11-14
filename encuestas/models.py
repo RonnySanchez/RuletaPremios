@@ -432,6 +432,14 @@ class TemaRuleta(models.Model):
         blank=True,
         help_text="Banner superior usado en la pantalla de premio ganado."
     )
+    imagen_encabezado_cupon = models.ImageField(
+        "Imagen de encabezado del formulario de cupón",
+        upload_to=tema_ruleta_upload_to,
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Solo se usa en el formulario de cupón directo. Si queda vacío, se muestra el logo de EF Perfumes.",
+    )
     imagen_fondo_ruleta = models.ImageField(
         "Imagen de fondo de ruleta",
         upload_to=tema_ruleta_upload_to,
@@ -478,6 +486,7 @@ class TemaRuleta(models.Model):
             '--pointer-color-3': '#97222d',
             '--ruleta-header-image': 'var(--ruleta-header-image-default)',
             '--premio-header-image': 'var(--premio-header-image-default)',
+            '--cupon-contacto-header-image': 'var(--cupon-contacto-header-image-default)',
             '--ruleta-bg-image': 'none',
             '--ruleta-aro-image': 'var(--ruleta-aro-image-default)',
         }
@@ -524,6 +533,10 @@ class TemaRuleta(models.Model):
             '--premio-header-image': self._image_css_value(
                 self.imagen_encabezado_premio,
                 'var(--premio-header-image-default)'
+            ),
+            '--cupon-contacto-header-image': self._image_css_value(
+                self.imagen_encabezado_cupon,
+                'var(--cupon-contacto-header-image-default)',
             ),
             '--ruleta-bg-image': self._image_css_value(self.imagen_fondo_ruleta, 'none'),
             '--ruleta-aro-image': self._image_css_value(
@@ -671,6 +684,7 @@ class EncuestaFijaRespuesta(models.Model):
     DNI = models.CharField(max_length=20, blank=True, verbose_name='DNI/CE/Pasaporte')
     acepPolPriv = models.BooleanField()
     acepProm = models.BooleanField(null=True, blank=True)  # Este campo es opcional
+    acepWhatsApp = models.BooleanField('Aceptó mensajes por WhatsApp', default=False)
     fecha_respuesta = models.DateField(default=date.today)
     tienda = models.ForeignKey(Tienda, on_delete=models.CASCADE, related_name='respuestas_encuesta', null=True, blank=True)
     

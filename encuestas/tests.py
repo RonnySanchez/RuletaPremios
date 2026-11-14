@@ -80,6 +80,7 @@ class CampanaCuponTests(TestCase):
         self.assertIsNone(premio.respuesta.valoracion_producto)
         self.assertEqual(premio.respuesta.DNI, '')
         self.assertFalse(premio.respuesta.acepProm)
+        self.assertFalse(premio.respuesta.acepWhatsApp)
         self.assertEqual(timezone.localtime(cupon.inicio), timezone.make_aware(datetime(2027, 1, 1)))
         self.assertEqual(timezone.localtime(cupon.vencimiento).date(), datetime(2027, 1, 31).date())
         self.assertEqual(cupon.emitido_en, self.ahora)
@@ -136,10 +137,19 @@ class CampanaCuponTests(TestCase):
         respuesta = self.client.get(url)
         self.assertEqual(respuesta.status_code, 200)
         self.assertTemplateUsed(respuesta, 'contacto_cupon.html')
+        self.assertContains(respuesta, 'Completa tus datos y obtén tu cupón de descuento')
+        self.assertContains(respuesta, 'Quiero recibir este cupón por WhatsApp en el número indicado')
+        self.assertContains(respuesta, 'name="acepWhatsApp"', count=1)
+        self.assertNotContains(respuesta, 'Vigencia del cupón:')
+        self.assertNotContains(respuesta, 'Aplicable a:')
+        self.assertNotContains(respuesta, self.ticket.codigo)
+        self.assertNotContains(respuesta, self.campana.descripcion)
         self.assertContains(respuesta, 'Recibir mi cupón')
         envio = self.client.post(url, {**self.datos, 'codigo_ticket': 'ALTERADO', 'monto': 100000})
         self.assertEqual(envio.status_code, 302)
-        self.assertEqual(EncuestaFijaRespuesta.objects.get().codigo_ticket, self.ticket.codigo)
+        registro = EncuestaFijaRespuesta.objects.get()
+        self.assertEqual(registro.codigo_ticket, self.ticket.codigo)
+        self.assertFalse(registro.acepWhatsApp)
         resultado = self.client.get(envio.url)
         self.assertContains(resultado, Cupon.objects.get().codigo)
         self.assertContains(resultado, '01/01/2027')
@@ -147,6 +157,14 @@ class CampanaCuponTests(TestCase):
         self.assertEqual(self.client.post(url, self.datos).url, envio.url)
         with patch('django.utils.timezone.now', return_value=self.ahora + timedelta(days=40)):
             self.assertEqual(self.client.get(url).url, envio.url)
+
+    def test_consentimiento_whatsapp_se_guarda_aparte_de_publicidad(self):
+        url = reverse('contacto_cupon', args=[self.ticket.token_participacion])
+        envio = self.client.post(url, {**self.datos, 'acepWhatsApp': 'on'})
+        self.assertEqual(envio.status_code, 302)
+        respuesta = EncuestaFijaRespuesta.objects.get()
+        self.assertTrue(respuesta.acepWhatsApp)
+        self.assertFalse(respuesta.acepProm)
 
     def test_token_desconocido_y_ruta_legacy_no_exponen_cupon(self):
         premio = self.emitir()
@@ -172,6 +190,7 @@ class CampanaCuponTests(TestCase):
             texto_principal='#172b22', texto_secundario='#40534a', segmento_5='#b32348',
             imagen_encabezado_ruleta='static/images/gira y gana.png',
             imagen_encabezado_premio='static/images/felicidades1.png',
+            imagen_encabezado_cupon='static/images/participa concurso.png',
             imagen_fondo_ruleta='static/img/fondoruleta.png',
         )
         self.campana.tema_ruleta = tema
@@ -180,7 +199,9 @@ class CampanaCuponTests(TestCase):
         formulario = self.client.get(url_formulario)
         self.assertEqual(formulario.context['ruleta_theme_vars'], tema.css_variables())
         self.assertContains(formulario, 'ruleta-theme ruleta-page cupon-contacto-page')
-        self.assertContains(formulario, 'class="ruleta-header-banner"')
+        self.assertContains(formulario, 'class="cupon-contacto-banner"')
+        self.assertContains(formulario, '--cupon-contacto-header-image: url("/static/images/participa concurso.png");')
+        self.assertNotContains(formulario, 'class="ruleta-header-banner"')
         self.assertContains(formulario, '--ruleta-bg-color: #eff6ed;')
         premio = self.emitir()
         url_resultado = reverse('resultado_cupon', args=[premio.token_resultado])
