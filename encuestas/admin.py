@@ -36,6 +36,7 @@ TEMA_RULETA_COLOR_FIELDS = (
 TEMA_RULETA_IMAGE_SELECTOR_FIELDS = {
     'imagen_encabezado_ruleta': 'imagen_encabezado_ruleta_existente',
     'imagen_encabezado_premio': 'imagen_encabezado_premio_existente',
+    'imagen_encabezado_cupon': 'imagen_encabezado_cupon_existente',
     'imagen_fondo_ruleta': 'imagen_fondo_ruleta_existente',
     'imagen_aro_ruleta': 'imagen_aro_ruleta_existente',
 }
@@ -193,6 +194,12 @@ class TemaRuletaAdminForm(forms.ModelForm):
         choices=(),
         widget=ImageChoiceSelect
     )
+    imagen_encabezado_cupon_existente = forms.ChoiceField(
+        label='Seleccionar encabezado del formulario de cupón del servidor',
+        required=False,
+        choices=(),
+        widget=ImageChoiceSelect
+    )
     imagen_fondo_ruleta_existente = forms.ChoiceField(
         label='Seleccionar fondo de ruleta del servidor',
         required=False,
@@ -262,6 +269,7 @@ class TemaRuletaAdmin(admin.ModelAdmin):
     readonly_fields = (
         'vista_imagen_encabezado_ruleta',
         'vista_imagen_encabezado_premio',
+        'vista_imagen_encabezado_cupon',
         'vista_imagen_fondo_ruleta',
         'vista_imagen_aro_ruleta',
     )
@@ -286,6 +294,9 @@ class TemaRuletaAdmin(admin.ModelAdmin):
                 'vista_imagen_encabezado_premio',
                 'imagen_encabezado_premio',
                 'imagen_encabezado_premio_existente',
+                'vista_imagen_encabezado_cupon',
+                'imagen_encabezado_cupon',
+                'imagen_encabezado_cupon_existente',
                 'vista_imagen_fondo_ruleta',
                 'imagen_fondo_ruleta',
                 'imagen_fondo_ruleta_existente',
@@ -330,6 +341,10 @@ class TemaRuletaAdmin(admin.ModelAdmin):
     def vista_imagen_encabezado_premio(self, obj):
         return self._image_preview(obj, 'imagen_encabezado_premio')
     vista_imagen_encabezado_premio.short_description = 'Vista encabezado premio'
+
+    def vista_imagen_encabezado_cupon(self, obj):
+        return self._image_preview(obj, 'imagen_encabezado_cupon')
+    vista_imagen_encabezado_cupon.short_description = 'Vista encabezado formulario de cupón'
 
     def vista_imagen_fondo_ruleta(self, obj):
         return self._image_preview(obj, 'imagen_fondo_ruleta')
@@ -816,6 +831,7 @@ class EncuestaFijaRespuestaResources(resources.ModelResource):
 @admin.register(EncuestaFijaRespuesta)
 class EncuestaFijaRespuestaAdmin(ExportMixin, admin.ModelAdmin):
     resource_class = EncuestaFijaRespuestaResources
+    readonly_fields = ('acepWhatsApp',)
     # Visualización con columnas individuales para cada valoración
     list_display = (
         'nombre', 
@@ -834,6 +850,7 @@ class EncuestaFijaRespuestaAdmin(ExportMixin, admin.ModelAdmin):
         'fecha_respuesta', 
         'encuesta_fija', 
         'tienda',
+        'acepWhatsApp',
         'valoracion_producto',
         'valoracion_atencion',
         'probabilidad_recomendacion',

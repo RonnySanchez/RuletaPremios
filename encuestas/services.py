@@ -70,6 +70,7 @@ def entregar_premio_directo(campana, tienda, ticket, datos):
             'nombre': datos['nombre'], 'apellidos': datos['apellidos'],
             'telefono': datos['telefono'], 'correo': datos['correo'],
             'acepPolPriv': True, 'acepProm': datos.get('acepProm', False),
+            'acepWhatsApp': datos.get('acepWhatsApp', False),
             'fnac': datos.get('fnac'), 'DNI': datos.get('DNI', ''),
             'tipo_identificacion': datos.get('tipo_identificacion', ''),
             'valoracion_producto': datos.get('valoracion_producto'),

@@ -154,4 +154,8 @@ class ContactoCuponForm(forms.Form):
     correo = forms.EmailField(label='Correo electrónico', widget=forms.EmailInput(attrs={'class': 'form-control', 'autocomplete': 'email'}))
     acepPolPriv = forms.BooleanField(label='Acepto los términos y condiciones y la política de privacidad de esta promoción.')
     acepProm = forms.BooleanField(label='Acepto recibir comunicaciones de promociones, ofertas y publicidad de la marca.', required=False)
+    acepWhatsApp = forms.BooleanField(
+        label='Quiero recibir este cupón por WhatsApp en el número indicado',
+        required=False,
+    )
     

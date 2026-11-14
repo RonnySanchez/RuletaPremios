@@ -3,12 +3,18 @@
 .cupon-page p { margin-bottom: 1rem; text-align: inherit; }
 .cupon-brand { display: flex; flex-direction: column; align-items: center; gap: 18px; padding-bottom: 22px; border-bottom: 1px solid var(--ef-border-soft); font-weight: 700; }
 .cupon-brand span { color: var(--ef-text); font-size: 1rem; }
+.cupon-contacto-page { --cupon-contacto-header-image-default: url("../images/Logo EF Blanco.svg"); }
+.cupon-contacto-banner {
+    background-image: var(--cupon-contacto-header-image, var(--cupon-contacto-header-image-default));
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: contain;
+    width: 100%;
+    max-width: 420px;
+    height: 112px;
+}
 .cupon-content { padding: 28px 0; overflow-wrap: anywhere; }
 .cupon-content h1 { font-size: 28px; line-height: 1.25; margin: 0 0 18px; overflow-wrap: anywhere; }
-.cupon-beneficio { margin: 24px 0; padding: 18px 0; border-block: 1px solid var(--ef-border-soft); }
-.cupon-beneficio strong, .cupon-beneficio span { display: block; }
-.cupon-beneficio strong { color: var(--ef-text); font-size: 24px; margin-bottom: 10px; }
-.cupon-beneficio span { color: var(--ef-muted-text); }
 .cupon-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 .cupon-field label { display: block; margin-bottom: 6px; }
 .cupon-field input { width: 100%; min-width: 0; border: 1px solid var(--ef-muted-text); border-radius: 4px; padding: 10px; background-color: var(--ef-card-soft); color: var(--ef-text); caret-color: var(--ef-text); }
@@ -19,7 +25,7 @@
 .cupon-page a { color: var(--ef-text); text-decoration: underline; }
 .cupon-submit { margin-top: 26px; padding: 12px 22px; border: 1px solid currentColor; border-radius: 4px; background: var(--ef-card-soft); color: var(--ef-text); font: inherit; font-weight: 700; max-width: 100%; }
 .cupon-submit:hover { text-decoration: underline; }
-.cupon-submit:focus-visible, .cupon-field input:focus-visible, .cupon-page a:focus-visible { outline: 3px solid var(--wheel-color-4); outline-offset: 3px; }
+.cupon-submit:focus-visible, .cupon-field input:focus-visible, .cupon-consent input:focus-visible, .cupon-page a:focus-visible { outline: 3px solid var(--wheel-color-4); outline-offset: 3px; }
 .cupon-error { color: var(--ef-text); border-left: 3px solid var(--wheel-color-5); padding-left: 10px; margin-top: 8px; }
 .cupon-error ul { padding-left: 20px; }
 .cupon-eyebrow { color: var(--ef-muted-text); }
