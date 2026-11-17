@@ -18,6 +18,14 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv()
 
+CUPON_WHATSAPP_HABILITADO = os.getenv("CUPON_WHATSAPP_HABILITADO", "").lower() == "true"
+CUPON_WHATSAPP_CHATBOTS_CUSTOM = os.getenv("CUPON_WHATSAPP_CHATBOTS_CUSTOM", "")
+CUPON_WHATSAPP_AUTHORIZATION = os.getenv("CUPON_WHATSAPP_AUTHORIZATION", "")
+CUPON_WHATSAPP_PLANTILLA_NOMBRE = os.getenv("CUPON_WHATSAPP_PLANTILLA_NOMBRE", "")
+CUPON_WHATSAPP_PLANTILLA_ID = os.getenv("CUPON_WHATSAPP_PLANTILLA_ID", "")
+CUPON_WHATSAPP_IDIOMA = os.getenv("CUPON_WHATSAPP_IDIOMA", "es")
+CUPON_WHATSAPP_COMPANY_PHONE_ID = os.getenv("CUPON_WHATSAPP_COMPANY_PHONE_ID", "")
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
 

@@ -6,10 +6,37 @@ from django.contrib import admin
 from .models import (
     CategoriaCupon,
     Cupon,
+    NotificacionCuponWhatsApp,
     PlantillaCuponPremio,
     PresentacionCupon,
     UsoCupon,
 )
+
+
+@admin.register(NotificacionCuponWhatsApp)
+class NotificacionCuponWhatsAppAdmin(admin.ModelAdmin):
+    list_display = ("id", "cupon", "destino_oculto", "estado", "estado_http", "creado_en", "intento_en")
+    list_filter = ("estado", "creado_en")
+    search_fields = ("cupon__codigo",)
+    list_select_related = ("cupon",)
+    fields = (
+        "cupon", "destino_oculto", "estado", "creado_en", "intento_en",
+        "finalizado_en", "estado_http", "detalle",
+    )
+    readonly_fields = fields
+
+    @admin.display(description="Destino")
+    def destino_oculto(self, obj):
+        return f"*******{obj.destino[-4:]}" if obj.destino else "-"
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 def generar_codigo_manual(longitud=6, prefijo="CUPON"):
