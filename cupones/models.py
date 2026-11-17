@@ -297,3 +297,31 @@ class UsoCupon(models.Model):
         verbose_name = "Registro de uso de cupon"
         verbose_name_plural = "Registros de uso de cupones"
         ordering = ["-fecha_uso"]
+
+
+class NotificacionCuponWhatsApp(models.Model):
+    class Estado(models.TextChoices):
+        PENDIENTE = "PENDIENTE", "Pendiente"
+        ENVIANDO = "ENVIANDO", "Enviando"
+        ACEPTADO = "ACEPTADO", "Aceptado por HTTP"
+        RECHAZADO = "RECHAZADO", "Rechazado por el proveedor"
+        INCIERTO = "INCIERTO", "Resultado incierto"
+        OMITIDO = "OMITIDO", "Omitido sin enviar"
+
+    cupon = models.OneToOneField(Cupon, on_delete=models.PROTECT, related_name="notificacion_whatsapp")
+    destino = models.CharField(max_length=11, blank=True, editable=False)
+    estado = models.CharField(max_length=12, choices=Estado.choices, default=Estado.PENDIENTE)
+    creado_en = models.DateTimeField(auto_now_add=True)
+    intento_en = models.DateTimeField(null=True, blank=True)
+    finalizado_en = models.DateTimeField(null=True, blank=True)
+    estado_http = models.PositiveSmallIntegerField(null=True, blank=True)
+    detalle = models.CharField(max_length=100, blank=True)
+
+    class Meta:
+        ordering = ["pk"]
+        indexes = [models.Index(fields=["estado", "id"])]
+        verbose_name = "Notificación de cupón por WhatsApp"
+        verbose_name_plural = "Notificaciones de cupones por WhatsApp"
+
+    def __str__(self):
+        return f"WhatsApp #{self.pk}"

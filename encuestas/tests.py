@@ -1,11 +1,15 @@
 import uuid
+import json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from decimal import Decimal
+from io import StringIO
 from threading import Barrier
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
+from urllib.error import HTTPError
 
 from django.contrib.auth import get_user_model
+from django.core.management import call_command, CommandError
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connections, transaction
 from django.test import Client, TestCase, TransactionTestCase, override_settings, skipUnlessDBFeature
@@ -13,7 +17,7 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from cupones.models import Cupon, PlantillaCuponPremio, PresentacionCupon
+from cupones.models import Cupon, NotificacionCuponWhatsApp, PlantillaCuponPremio, PresentacionCupon
 from .forms import ContactoCuponForm, EncuestaFijaForm
 from .models import (
     EncuestaFija, EncuestaFijaPremio, EncuestaFijaRespuesta,
@@ -81,6 +85,7 @@ class CampanaCuponTests(TestCase):
         self.assertEqual(premio.respuesta.DNI, '')
         self.assertFalse(premio.respuesta.acepProm)
         self.assertFalse(premio.respuesta.acepWhatsApp)
+        self.assertFalse(NotificacionCuponWhatsApp.objects.exists())
         self.assertEqual(timezone.localtime(cupon.inicio), timezone.make_aware(datetime(2027, 1, 1)))
         self.assertEqual(timezone.localtime(cupon.vencimiento).date(), datetime(2027, 1, 31).date())
         self.assertEqual(cupon.emitido_en, self.ahora)
@@ -165,6 +170,113 @@ class CampanaCuponTests(TestCase):
         respuesta = EncuestaFijaRespuesta.objects.get()
         self.assertTrue(respuesta.acepWhatsApp)
         self.assertFalse(respuesta.acepProm)
+        envio = NotificacionCuponWhatsApp.objects.get()
+        self.assertEqual(envio.estado, NotificacionCuponWhatsApp.Estado.PENDIENTE)
+        self.assertEqual(envio.destino, '51987654321')
+        self.client.post(url, {**self.datos, 'acepWhatsApp': 'on'})
+        self.assertEqual(NotificacionCuponWhatsApp.objects.count(), 1)
+
+    def test_solo_aceptar_publicidad_no_encola_whatsapp(self):
+        self.datos['acepProm'] = True
+        self.emitir()
+        self.assertFalse(NotificacionCuponWhatsApp.objects.exists())
+
+    def test_whatsapp_numero_no_valido_no_impide_emitir(self):
+        self.datos.update(acepWhatsApp=True, telefono='123456789')
+        premio = self.emitir()
+        envio = premio.cupon.notificacion_whatsapp
+        self.assertEqual(envio.estado, NotificacionCuponWhatsApp.Estado.OMITIDO)
+        self.assertIsNone(envio.intento_en)
+
+    @override_settings(CUPON_WHATSAPP_HABILITADO=False)
+    def test_comando_deshabilitado_no_procesa_pendientes(self):
+        self.datos['acepWhatsApp'] = True
+        self.emitir()
+        with patch('cupones.whatsapp.build_opener') as abrir:
+            call_command('enviar_cupones_whatsapp', stdout=StringIO())
+        abrir.assert_not_called()
+        self.assertEqual(NotificacionCuponWhatsApp.objects.get().estado, 'PENDIENTE')
+
+    @override_settings(CUPON_WHATSAPP_HABILITADO=True, CUPON_WHATSAPP_CHATBOTS_CUSTOM='')
+    def test_comando_sin_configuracion_no_toma_pendientes(self):
+        self.datos['acepWhatsApp'] = True
+        self.emitir()
+        with self.assertRaises(CommandError):
+            call_command('enviar_cupones_whatsapp', stdout=StringIO())
+        self.assertEqual(NotificacionCuponWhatsApp.objects.get().estado, 'PENDIENTE')
+
+    @override_settings(
+        CUPON_WHATSAPP_HABILITADO=True, CUPON_WHATSAPP_CHATBOTS_CUSTOM='prueba-custom',
+        CUPON_WHATSAPP_AUTHORIZATION='prueba-auth', CUPON_WHATSAPP_PLANTILLA_NOMBRE='cupon_prueba',
+        CUPON_WHATSAPP_PLANTILLA_ID='1234', CUPON_WHATSAPP_IDIOMA='es',
+        CUPON_WHATSAPP_COMPANY_PHONE_ID='10',
+    )
+    def test_envio_whatsapp_con_log_y_sin_duplicados(self):
+        self.datos['acepWhatsApp'] = True
+        cupon = self.emitir().cupon
+        respuesta = MagicMock()
+        respuesta.__enter__.return_value.status = 202
+        with patch('cupones.whatsapp.build_opener') as abrir:
+            abrir.return_value.open.return_value = respuesta
+            for _ in range(2):
+                call_command('enviar_cupones_whatsapp', stdout=StringIO())
+            abrir.return_value.open.assert_called_once()
+            solicitud = abrir.return_value.open.call_args.args[0]
+        self.assertEqual(solicitud.full_url, 'https://api.efperfumes.com/conversation')
+        self.assertEqual(solicitud.get_method(), 'POST')
+        self.assertEqual(solicitud.get_header('Authorization'), 'prueba-auth')
+        self.assertEqual(solicitud.get_header('X-chatbots-custom'), 'prueba-custom')
+        datos = json.loads(solicitud.data)
+        self.assertEqual(datos['to'], '51987654321')
+        self.assertEqual(datos['company_phone_id'], 10)
+        plantilla = datos['messageData']['template']
+        self.assertEqual(plantilla['id'], 1234)
+        self.assertEqual(plantilla['name'], 'cupon_prueba')
+        self.assertEqual(
+            [p['text'] for p in plantilla['components'][0]['parameters']],
+            ['Ana', '30%', cupon.codigo, 'del 01/01/2027 al 31/01/2027'],
+        )
+        envio = NotificacionCuponWhatsApp.objects.get()
+        self.assertEqual(envio.estado, 'ACEPTADO')
+        self.assertEqual(envio.estado_http, 202)
+        self.assertIsNotNone(envio.intento_en)
+        self.assertIsNotNone(envio.finalizado_en)
+
+    def test_whatsapp_no_reintenta_errores_ni_registra_respuestas_sensibles(self):
+        from cupones.whatsapp import procesar_notificacion_whatsapp
+
+        self.datos['acepWhatsApp'] = True
+        config = ({}, 'cupon_prueba', 'es', 1234, 10)
+        resultados = [
+            (TimeoutError('dato sensible'), 'INCIERTO', None),
+            (HTTPError('', 400, 'dato sensible', {}, None), 'RECHAZADO', 400),
+            (HTTPError('', 503, 'dato sensible', {}, None), 'INCIERTO', 503),
+        ]
+        for i, (error, estado, http) in enumerate(resultados):
+            with self.subTest(estado=estado, http=http):
+                cupon = entregar_premio_directo(self.campana, self.tienda, self.crear_ticket(f'WA-{i}'), self.datos).cupon
+                envio = cupon.notificacion_whatsapp
+                with patch('cupones.whatsapp.build_opener') as abrir:
+                    abrir.return_value.open.side_effect = error
+                    self.assertEqual(procesar_notificacion_whatsapp(envio.pk, config), estado)
+                    self.assertIsNone(procesar_notificacion_whatsapp(envio.pk, config))
+                    abrir.return_value.open.assert_called_once()
+                envio.refresh_from_db()
+                self.assertEqual(envio.estado_http, http)
+                self.assertNotIn('dato sensible', envio.detalle)
+
+    def test_whatsapp_omite_si_cambia_el_numero_antes_de_enviar(self):
+        from cupones.whatsapp import procesar_notificacion_whatsapp
+
+        self.datos['acepWhatsApp'] = True
+        premio = self.emitir()
+        EncuestaFijaRespuesta.objects.filter(pk=premio.respuesta_id).update(telefono='911111111')
+        envio = premio.cupon.notificacion_whatsapp
+        with patch('cupones.whatsapp.build_opener') as abrir:
+            self.assertEqual(procesar_notificacion_whatsapp(envio.pk, ()), 'OMITIDO')
+        abrir.assert_not_called()
+        envio.refresh_from_db()
+        self.assertIsNone(envio.intento_en)
 
     def test_token_desconocido_y_ruta_legacy_no_exponen_cupon(self):
         premio = self.emitir()

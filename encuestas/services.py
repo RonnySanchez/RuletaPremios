@@ -7,6 +7,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from cupones.services import emitir_cupon_para_premio
+from cupones.whatsapp import encolar_cupon_whatsapp
 from .models import EncuestaFija, EncuestaFijaPremio, EncuestaFijaRespuesta, ParticipacionCuponDirecto
 
 
@@ -87,8 +88,11 @@ def entregar_premio_directo(campana, tienda, ticket, datos):
         DNI=respuesta.DNI, tipo_identificacion=respuesta.tipo_identificacion,
         token_resultado=uuid.uuid4(),
     )
-    if emitir_cupon_para_premio(premio) is None:
+    cupon = emitir_cupon_para_premio(premio)
+    if cupon is None:
         raise ValidationError('El premio no tiene plantilla de cupon.')
+    if datos.get('acepWhatsApp') and respuesta.acepWhatsApp and respuesta.telefono == datos['telefono']:
+        encolar_cupon_whatsapp(cupon, respuesta.telefono)
     participacion.premio_entregado = premio
     participacion.save(update_fields=['premio_entregado'])
     return premio
