@@ -33,17 +33,26 @@ nuevas si los valores anteriores se compartieron en un chat o repositorio:
 ```dotenv
 CUPON_WHATSAPP_HABILITADO=False
 CUPON_WHATSAPP_CHATBOTS_CUSTOM=<valor_nuevo>
-CUPON_WHATSAPP_AUTHORIZATION=<valor_nuevo>
-CUPON_WHATSAPP_PLANTILLA_NOMBRE=<nombre_aprobado_del_cupon>
-CUPON_WHATSAPP_PLANTILLA_ID=<id_numerico_del_cupon>
-CUPON_WHATSAPP_IDIOMA=es
-CUPON_WHATSAPP_COMPANY_PHONE_ID=<id_numerico_del_remitente>
+CUPON_USUARIO_WEB=<usuario_del_login>
+CUPON_CLAVE=<clave_del_login>
 ```
 
-El proceso usa `POST https://api.efperfumes.com/conversation`. Envía el
-valor de `Authorization` tal como se configura, sin añadirle un prefijo.
-Confirma el nombre, ID, idioma y remitente de la plantilla de cupón; los
-del ejemplo `contacto_web` no corresponden a esta notificación.
+Cuando hay pendientes, el comando obtiene un token mediante
+`POST https://api.efperfumes.com/user/login`, con usuario, clave y la cabecera
+`x-chatbots-custom`. Usa ese token en memoria para el lote y lo envía como
+`Authorization` sin prefijo al hacer `POST https://api.efperfumes.com/conversation`.
+Cada ejecución obtiene un token nuevo para cubrir el vencimiento diario.
+Si falla el login o el usuario carece de acceso al remitente, el comando
+termina con un error y conserva las notificaciones pendientes.
+
+El código de `cupones/whatsapp.py` define la plantilla del cupón como `cupon_ef`,
+ID `661`, idioma `es`, y el remitente `company_phone_id = 1`, según el ejemplo
+de esta integración. Nombre, ID, idioma y componentes se eligen en el código
+para cada tipo de notificación.
+Puedes quitar del `.env` las variables antiguas `CUPON_WHATSAPP_AUTHORIZATION`,
+`CUPON_WHATSAPP_PLANTILLA_NOMBRE`, `CUPON_WHATSAPP_PLANTILLA_ID`,
+`CUPON_WHATSAPP_IDIOMA` y `CUPON_WHATSAPP_COMPANY_PHONE_ID`.
+
 No se envían la etiqueta comercial ni sus campos de captación; si la
 API del proveedor exige una etiqueta, confirma la configuración del cupón
 antes de habilitar el proceso.
@@ -59,7 +68,10 @@ en `messageData.template.components[0].parameters`, en este orden:
 | Vigencia | del 01/01/2027 al 31/01/2027 |
 
 El destino se envía como `51` seguido del celular peruano de nueve dígitos,
-sin el signo `+`. El envío no incluye correo ni datos de publicidad.
+sin el signo `+`. Los parámetros siguen el orden usado en el flujo de cupones:
+nombre, descuento, código y vigencia. Confirma que corresponda al texto aprobado
+de `cupon_ef`, ya que el ejemplo de la API los llama Nombre, Texto1, Texto2 y Texto3.
+El envío no incluye correo ni datos de publicidad.
 
 ## Primer envío y operación
 
@@ -83,7 +95,9 @@ notificaciones autorizadas.
 
 El admin muestra cupón, destino enmascarado, estado, fechas y código HTTP.
 No se guardan credenciales ni el cuerpo de respuesta
-del proveedor. **Aceptado por HTTP** indica un `2xx`, no confirma que el
+del proveedor. Si un rechazo incluye un identificador de solicitud con
+formato reconocido, **Detalle** lo muestra para buscar el intento en los logs
+de la API. **Aceptado por HTTP** indica un `2xx`, no confirma que el
 cliente recibió o leyó el mensaje. El contrato de seguimiento de entrega
 del proveedor no forma parte de esta integración.
 

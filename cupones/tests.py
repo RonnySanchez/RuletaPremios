@@ -1,9 +1,11 @@
 from concurrent.futures import ThreadPoolExecutor
+import json
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from threading import Barrier
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
+from urllib.error import HTTPError, URLError
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -23,6 +25,62 @@ from .services import (
     renderizar_codigo,
     validar_formato_codigo,
 )
+from .whatsapp import configuracion_whatsapp
+
+
+@override_settings(
+    CUPON_USUARIO_WEB="usuario-prueba", CUPON_CLAVE="clave-prueba",
+    CUPON_WHATSAPP_CHATBOTS_CUSTOM="custom-prueba",
+)
+class WhatsAppLoginTests(SimpleTestCase):
+    def test_login_obtiene_token_nuevo_en_cada_ejecucion(self):
+        respuestas = []
+        for token in ("token-uno", "token-dos"):
+            respuesta = MagicMock()
+            respuesta.__enter__.return_value.status = 200
+            respuesta.__enter__.return_value.read.return_value = json.dumps({
+                "token": token, "company_phones": [{"company_phone_id": "1"}],
+            }).encode()
+            respuestas.append(respuesta)
+        with patch("cupones.whatsapp.build_opener") as abrir:
+            abrir.return_value.open.side_effect = respuestas
+            self.assertEqual(configuracion_whatsapp()["Authorization"], "token-uno")
+            self.assertEqual(configuracion_whatsapp()["Authorization"], "token-dos")
+            solicitud = abrir.return_value.open.call_args.args[0]
+        self.assertEqual(solicitud.full_url, "https://api.efperfumes.com/user/login")
+        self.assertEqual(solicitud.get_method(), "POST")
+        self.assertEqual(json.loads(solicitud.data), {"username": "usuario-prueba", "password": "clave-prueba"})
+        self.assertEqual(solicitud.get_header("X-chatbots-custom"), "custom-prueba")
+        self.assertIsNone(solicitud.get_header("Authorization"))
+
+    def test_login_invalido_no_expone_la_respuesta(self):
+        casos = [
+            (b"clave-prueba custom-prueba", "no devolvió un JSON válido"),
+            (b"[]", "no devolvió un token"),
+            (b'{"token": ""}', "no devolvió un token"),
+            (b'{"token": "token\\r\\nsecreto"}', "contiene caracteres no válidos"),
+            (b'{"token": "token-secreto", "company_phones": []}', "no tiene autorizado"),
+        ]
+        for cuerpo, mensaje in casos:
+            with self.subTest(mensaje=mensaje), patch("cupones.whatsapp.build_opener") as abrir:
+                respuesta = abrir.return_value.open.return_value.__enter__.return_value
+                respuesta.status = 200
+                respuesta.read.return_value = cuerpo
+                with self.assertRaisesMessage(ValueError, mensaje) as error:
+                    configuracion_whatsapp()
+                self.assertNotIn("clave-prueba", str(error.exception))
+                self.assertNotIn("token-secreto", str(error.exception))
+
+    def test_fallo_http_o_de_red_no_expone_las_credenciales(self):
+        for fallo, mensaje in (
+            (HTTPError("", 401, "clave-prueba", {}, None), "HTTP 401"),
+            (URLError("clave-prueba"), "No se pudo conectar"),
+        ):
+            with self.subTest(mensaje=mensaje), patch("cupones.whatsapp.build_opener") as abrir:
+                abrir.return_value.open.side_effect = fallo
+                with self.assertRaisesMessage(ValueError, mensaje) as error:
+                    configuracion_whatsapp()
+                self.assertNotIn("clave-prueba", str(error.exception))
 
 
 @override_settings(TIME_ZONE="America/Lima", USE_TZ=True)
