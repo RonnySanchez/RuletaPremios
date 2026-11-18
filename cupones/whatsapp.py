@@ -35,6 +35,7 @@ def configuracion_whatsapp():
         "x-chatbots-custom": settings.CUPON_WHATSAPP_CHATBOTS_CUSTOM.strip(),
         "Authorization": settings.CUPON_WHATSAPP_AUTHORIZATION.strip(),
         "Content-Type": "application/json",
+        "Accept": "application/json",
     }
     nombre = settings.CUPON_WHATSAPP_PLANTILLA_NOMBRE.strip()
     idioma = settings.CUPON_WHATSAPP_IDIOMA.strip()
@@ -81,13 +82,31 @@ def _cuerpo_envio(notificacion, nombre, plantilla, idioma, plantilla_id, telefon
     }
 
 
+def _detalle_rechazo(cabeceras):
+    detalle = "Solicitud no aceptada por el proveedor."
+    if not cabeceras:
+        return detalle
+
+    # Conserva solo identificadores con formato reconocido, sin copiar el cuerpo del error.
+    for nombre in ("x-request-id", "x-correlation-id", "request-id"):
+        referencia = cabeceras.get(nombre, "")
+        if re.fullmatch(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", referencia, re.I):
+            return f"{detalle} {nombre}={referencia}"
+    ray = cabeceras.get("cf-ray", "")
+    if re.fullmatch(r"[0-9a-f]{16}-[A-Z]{3}", ray, re.ASCII):
+        return f"{detalle} cf-ray={ray}"
+    return detalle
+
+
 def _enviar_al_proveedor(encabezados, cuerpo):
     solicitud = Request(ENDPOINT, data=json.dumps(cuerpo).encode("utf-8"), headers=encabezados, method="POST")
+    cabeceras_respuesta = None
     try:
         with build_opener(_SinRedirecciones()).open(solicitud, timeout=10) as respuesta:
             codigo = respuesta.status
     except HTTPError as exc:
         codigo = exc.code
+        cabeceras_respuesta = exc.headers
         exc.close()
     except (URLError, OSError):
         return Estado.INCIERTO, None, "Sin respuesta HTTP concluyente."
@@ -95,7 +114,7 @@ def _enviar_al_proveedor(encabezados, cuerpo):
     if 200 <= codigo < 300:
         return Estado.ACEPTADO, codigo, "Aceptado por HTTP; entrega no confirmada."
     if 300 <= codigo < 500 and codigo != 408:
-        return Estado.RECHAZADO, codigo, "Solicitud no aceptada por el proveedor."
+        return Estado.RECHAZADO, codigo, _detalle_rechazo(cabeceras_respuesta)
     return Estado.INCIERTO, codigo, "Respuesta del proveedor no concluyente."
 
 

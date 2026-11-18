@@ -83,7 +83,9 @@ notificaciones autorizadas.
 
 El admin muestra cupón, destino enmascarado, estado, fechas y código HTTP.
 No se guardan credenciales ni el cuerpo de respuesta
-del proveedor. **Aceptado por HTTP** indica un `2xx`, no confirma que el
+del proveedor. Si un rechazo incluye un identificador de solicitud con
+formato reconocido, **Detalle** lo muestra para buscar el intento en los logs
+de la API. **Aceptado por HTTP** indica un `2xx`, no confirma que el
 cliente recibió o leyó el mensaje. El contrato de seguimiento de entrega
 del proveedor no forma parte de esta integración.
 

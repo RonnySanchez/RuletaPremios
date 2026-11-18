@@ -226,6 +226,7 @@ class CampanaCuponTests(TestCase):
             solicitud = abrir.return_value.open.call_args.args[0]
         self.assertEqual(solicitud.full_url, 'https://api.efperfumes.com/conversation')
         self.assertEqual(solicitud.get_method(), 'POST')
+        self.assertEqual(solicitud.get_header('Accept'), 'application/json')
         self.assertEqual(solicitud.get_header('Authorization'), 'prueba-auth')
         self.assertEqual(solicitud.get_header('X-chatbots-custom'), 'prueba-custom')
         datos = json.loads(solicitud.data)
@@ -274,9 +275,15 @@ class CampanaCuponTests(TestCase):
         cupon = self.emitir().cupon
         envio = cupon.notificacion_whatsapp
         config = ({}, 'cupon_prueba', 'es', 1234, 10)
+        referencia = '12345678-abcd-1234-abcd-123456789012'
         with patch('cupones.whatsapp.build_opener') as abrir:
-            abrir.return_value.open.side_effect = HTTPError('', 401, '', {}, None)
+            abrir.return_value.open.side_effect = HTTPError('', 401, '', {
+                'x-request-id': 'valor no apto para guardar', 'x-correlation-id': referencia,
+            }, None)
             self.assertEqual(procesar_notificacion_whatsapp(envio.pk, config), 'RECHAZADO')
+        envio.refresh_from_db()
+        self.assertIn(f'x-correlation-id={referencia}', envio.detalle)
+        self.assertNotIn('valor no apto para guardar', envio.detalle)
 
         self.client.force_login(get_user_model().objects.create_superuser(username='admin-whatsapp'))
         listado = reverse('admin:cupones_notificacioncuponwhatsapp_changelist')
