@@ -9,6 +9,8 @@ from unittest.mock import MagicMock, patch
 from urllib.error import HTTPError
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
+from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
 from django.core.management import call_command, CommandError
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connections, transaction
@@ -264,6 +266,57 @@ class CampanaCuponTests(TestCase):
                 envio.refresh_from_db()
                 self.assertEqual(envio.estado_http, http)
                 self.assertNotIn('dato sensible', envio.detalle)
+
+    def test_admin_puede_reintentar_la_misma_notificacion_tras_un_401(self):
+        from cupones.whatsapp import procesar_notificacion_whatsapp
+
+        self.datos['acepWhatsApp'] = True
+        cupon = self.emitir().cupon
+        envio = cupon.notificacion_whatsapp
+        config = ({}, 'cupon_prueba', 'es', 1234, 10)
+        with patch('cupones.whatsapp.build_opener') as abrir:
+            abrir.return_value.open.side_effect = HTTPError('', 401, '', {}, None)
+            self.assertEqual(procesar_notificacion_whatsapp(envio.pk, config), 'RECHAZADO')
+
+        self.client.force_login(get_user_model().objects.create_superuser(username='admin-whatsapp'))
+        listado = reverse('admin:cupones_notificacioncuponwhatsapp_changelist')
+        accion = {'action': 'poner_pendiente_para_reintento', ACTION_CHECKBOX_NAME: envio.pk, 'index': 0}
+        self.assertRedirects(self.client.post(listado, accion), listado)
+        envio.refresh_from_db()
+        self.assertEqual(envio.estado, 'PENDIENTE')
+        self.assertIsNone(envio.estado_http)
+        historial = reverse('admin:cupones_notificacioncuponwhatsapp_history', args=[envio.pk])
+        self.assertContains(self.client.get(historial), 'Reintento manual tras rechazo HTTP 401.')
+
+        with patch('cupones.whatsapp.build_opener') as abrir:
+            abrir.return_value.open.return_value.__enter__.return_value.status = 202
+            self.assertEqual(procesar_notificacion_whatsapp(envio.pk, config), 'ACEPTADO')
+            abrir.return_value.open.assert_called_once()
+        self.assertRedirects(self.client.post(listado, accion), listado)
+        envio.refresh_from_db()
+        self.assertEqual(envio.estado, 'ACEPTADO')
+        self.assertEqual(envio.cupon_id, cupon.pk)
+        self.assertEqual(NotificacionCuponWhatsApp.objects.count(), 1)
+
+    def test_admin_bloquea_el_reintento_sin_permiso_o_con_resultado_incierto(self):
+        self.datos['acepWhatsApp'] = True
+        envio = self.emitir().cupon.notificacion_whatsapp
+        NotificacionCuponWhatsApp.objects.filter(pk=envio.pk).update(estado='RECHAZADO', estado_http=401)
+        lector = get_user_model().objects.create_user(username='lector-whatsapp', is_staff=True)
+        lector.user_permissions.add(Permission.objects.get(codename='view_notificacioncuponwhatsapp'))
+        self.client.force_login(lector)
+        listado = reverse('admin:cupones_notificacioncuponwhatsapp_changelist')
+        accion = {'action': 'poner_pendiente_para_reintento', ACTION_CHECKBOX_NAME: envio.pk, 'index': 0}
+        self.assertNotContains(self.client.get(listado), 'poner_pendiente_para_reintento')
+        self.client.post(listado, accion)
+        envio.refresh_from_db()
+        self.assertEqual(envio.estado, 'RECHAZADO')
+
+        NotificacionCuponWhatsApp.objects.filter(pk=envio.pk).update(estado='INCIERTO', estado_http=503)
+        self.client.force_login(get_user_model().objects.create_superuser(username='admin-whatsapp'))
+        self.assertRedirects(self.client.post(listado, accion), listado)
+        envio.refresh_from_db()
+        self.assertEqual(envio.estado, 'INCIERTO')
 
     def test_whatsapp_omite_si_cambia_el_numero_antes_de_enviar(self):
         from cupones.whatsapp import procesar_notificacion_whatsapp

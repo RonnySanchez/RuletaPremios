@@ -81,13 +81,20 @@ registros por ejecución. No se instala una tarea programada por defecto.
 Mientras esté deshabilitado o no se ejecute, se acumularán las nuevas
 notificaciones autorizadas.
 
-El admin muestra, en solo lectura, cupón, destino enmascarado, estado,
-fechas y código HTTP. No se guardan credenciales ni el cuerpo de respuesta
+El admin muestra cupón, destino enmascarado, estado, fechas y código HTTP.
+No se guardan credenciales ni el cuerpo de respuesta
 del proveedor. **Aceptado por HTTP** indica un `2xx`, no confirma que el
 cliente recibió o leyó el mensaje. El contrato de seguimiento de entrega
 del proveedor no forma parte de esta integración.
 
-Un timeout, un `5xx` o una caída durante el proceso pueden dejar el
-resultado **Incierto** o **Enviando**. El comando no vuelve a procesar
-esos registros ni los rechazados: revisa primero el historial del
-proveedor para evitar un doble envío. No hay reenvío automático.
+Si el proveedor rechazó un envío, corrige la causa. En el listado del admin,
+selecciona esa notificación y aplica **Volver a poner en cola la notificación
+rechazada**. La acción requiere permiso de modificación de notificaciones y
+deja el código HTTP anterior en el historial del admin. El próximo comando
+de envío tomará el registro como pendiente y comprobará la vigencia del cupón
+y el permiso para el número registrado.
+
+Un timeout, un `5xx` o una caída durante el proceso pueden dejar el resultado
+**Incierto** o **Enviando**. Esos estados quedan fuera de la acción porque es
+posible que el mensaje ya se haya enviado. Consulta el historial del proveedor
+para confirmar el resultado.
