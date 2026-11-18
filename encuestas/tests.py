@@ -209,8 +209,9 @@ class CampanaCuponTests(TestCase):
 
     @override_settings(
         CUPON_WHATSAPP_HABILITADO=True, CUPON_WHATSAPP_CHATBOTS_CUSTOM='prueba-custom',
-        CUPON_WHATSAPP_AUTHORIZATION='prueba-auth', CUPON_WHATSAPP_PLANTILLA_NOMBRE='cupon_prueba',
-        CUPON_WHATSAPP_PLANTILLA_ID='1234', CUPON_WHATSAPP_IDIOMA='es',
+        CUPON_USUARIO_WEB='prueba-usuario', CUPON_CLAVE='prueba-clave',
+        CUPON_WHATSAPP_AUTHORIZATION='token-antiguo', CUPON_WHATSAPP_PLANTILLA_NOMBRE='contacto_web',
+        CUPON_WHATSAPP_PLANTILLA_ID='592', CUPON_WHATSAPP_IDIOMA='en',
         CUPON_WHATSAPP_COMPANY_PHONE_ID='10',
     )
     def test_envio_whatsapp_con_log_y_sin_duplicados(self):
@@ -218,23 +219,31 @@ class CampanaCuponTests(TestCase):
         cupon = self.emitir().cupon
         respuesta = MagicMock()
         respuesta.__enter__.return_value.status = 202
+        login = MagicMock()
+        login.__enter__.return_value.status = 200
+        login.__enter__.return_value.read.return_value = json.dumps({
+            'token': 'token-nuevo', 'company_phones': [{'company_phone_id': 1}],
+        }).encode()
         with patch('cupones.whatsapp.build_opener') as abrir:
-            abrir.return_value.open.return_value = respuesta
+            abrir.return_value.open.side_effect = [login, respuesta]
             for _ in range(2):
                 call_command('enviar_cupones_whatsapp', stdout=StringIO())
-            abrir.return_value.open.assert_called_once()
+            self.assertEqual(abrir.return_value.open.call_count, 2)
+            solicitud_login = abrir.return_value.open.call_args_list[0].args[0]
+            self.assertEqual(solicitud_login.full_url, 'https://api.efperfumes.com/user/login')
             solicitud = abrir.return_value.open.call_args.args[0]
         self.assertEqual(solicitud.full_url, 'https://api.efperfumes.com/conversation')
         self.assertEqual(solicitud.get_method(), 'POST')
         self.assertEqual(solicitud.get_header('Accept'), 'application/json')
-        self.assertEqual(solicitud.get_header('Authorization'), 'prueba-auth')
+        self.assertEqual(solicitud.get_header('Authorization'), 'token-nuevo')
         self.assertEqual(solicitud.get_header('X-chatbots-custom'), 'prueba-custom')
         datos = json.loads(solicitud.data)
         self.assertEqual(datos['to'], '51987654321')
-        self.assertEqual(datos['company_phone_id'], 10)
+        self.assertEqual(datos['company_phone_id'], 1)
         plantilla = datos['messageData']['template']
-        self.assertEqual(plantilla['id'], 1234)
-        self.assertEqual(plantilla['name'], 'cupon_prueba')
+        self.assertEqual(plantilla['id'], 661)
+        self.assertEqual(plantilla['name'], 'cupon_ef')
+        self.assertEqual(plantilla['language'], {'code': 'es'})
         self.assertEqual(
             [p['text'] for p in plantilla['components'][0]['parameters']],
             ['Ana', '30%', cupon.codigo, 'del 01/01/2027 al 31/01/2027'],
@@ -245,11 +254,27 @@ class CampanaCuponTests(TestCase):
         self.assertIsNotNone(envio.intento_en)
         self.assertIsNotNone(envio.finalizado_en)
 
+    @override_settings(
+        CUPON_WHATSAPP_HABILITADO=True, CUPON_WHATSAPP_CHATBOTS_CUSTOM='prueba-custom',
+        CUPON_USUARIO_WEB='prueba-usuario', CUPON_CLAVE='prueba-clave',
+    )
+    def test_fallo_de_login_conserva_los_pendientes(self):
+        self.datos['acepWhatsApp'] = True
+        envio = self.emitir().cupon.notificacion_whatsapp
+        with patch('cupones.whatsapp.build_opener') as abrir:
+            abrir.return_value.open.side_effect = HTTPError('', 401, 'dato sensible', {}, None)
+            with self.assertRaisesMessage(CommandError, 'El login de WhatsApp devolvió HTTP 401.'):
+                call_command('enviar_cupones_whatsapp', stdout=StringIO())
+            abrir.return_value.open.assert_called_once()
+        envio.refresh_from_db()
+        self.assertEqual(envio.estado, 'PENDIENTE')
+        self.assertIsNone(envio.intento_en)
+
     def test_whatsapp_no_reintenta_errores_ni_registra_respuestas_sensibles(self):
         from cupones.whatsapp import procesar_notificacion_whatsapp
 
         self.datos['acepWhatsApp'] = True
-        config = ({}, 'cupon_prueba', 'es', 1234, 10)
+        config = {}
         resultados = [
             (TimeoutError('dato sensible'), 'INCIERTO', None),
             (HTTPError('', 400, 'dato sensible', {}, None), 'RECHAZADO', 400),
@@ -274,7 +299,7 @@ class CampanaCuponTests(TestCase):
         self.datos['acepWhatsApp'] = True
         cupon = self.emitir().cupon
         envio = cupon.notificacion_whatsapp
-        config = ({}, 'cupon_prueba', 'es', 1234, 10)
+        config = {}
         referencia = '12345678-abcd-1234-abcd-123456789012'
         with patch('cupones.whatsapp.build_opener') as abrir:
             abrir.return_value.open.side_effect = HTTPError('', 401, '', {

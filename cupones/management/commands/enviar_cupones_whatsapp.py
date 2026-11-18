@@ -19,13 +19,16 @@ class Command(BaseCommand):
             return
         if options["limite"] < 1:
             raise CommandError("--limite debe ser mayor que cero.")
+        ids = list(NotificacionCuponWhatsApp.objects.filter(
+            estado=NotificacionCuponWhatsApp.Estado.PENDIENTE,
+        ).values_list("pk", flat=True)[:options["limite"]])
+        if not ids:
+            self.stdout.write("Procesados: 0")
+            return
         try:
             configuracion = configuracion_whatsapp()
         except ValueError as exc:
             raise CommandError(str(exc)) from None
-        ids = list(NotificacionCuponWhatsApp.objects.filter(
-            estado=NotificacionCuponWhatsApp.Estado.PENDIENTE,
-        ).values_list("pk", flat=True)[:options["limite"]])
         resultados = Counter(
             estado for pk in ids
             if (estado := procesar_notificacion_whatsapp(pk, configuracion)) is not None
