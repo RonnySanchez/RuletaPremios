@@ -1,7 +1,8 @@
 import secrets
 from datetime import datetime
 
-from django.contrib import admin
+from django.contrib import admin, messages
+from django.db import transaction
 
 from .models import (
     CategoriaCupon,
@@ -15,6 +16,7 @@ from .models import (
 
 @admin.register(NotificacionCuponWhatsApp)
 class NotificacionCuponWhatsAppAdmin(admin.ModelAdmin):
+    actions = ("poner_pendiente_para_reintento",)
     list_display = ("id", "cupon", "destino_oculto", "estado", "estado_http", "creado_en", "intento_en")
     list_filter = ("estado", "creado_en")
     search_fields = ("cupon__codigo",)
@@ -34,6 +36,34 @@ class NotificacionCuponWhatsAppAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+    def has_reintentar_permission(self, request):
+        return request.user.has_perm("cupones.change_notificacioncuponwhatsapp")
+
+    @admin.action(permissions=["reintentar"], description="Volver a poner en cola la notificación rechazada")
+    def poner_pendiente_para_reintento(self, request, queryset):
+        ids = list(queryset.values_list("pk", flat=True)[:2])
+        if len(ids) != 1:
+            self.message_user(request, "Selecciona una sola notificación para reintentar.", messages.WARNING)
+            return
+
+        estados = NotificacionCuponWhatsApp.Estado
+        with transaction.atomic():
+            notificacion = NotificacionCuponWhatsApp.objects.select_for_update().filter(pk=ids[0]).first()
+            if notificacion is None or notificacion.estado != estados.RECHAZADO:
+                self.message_user(request, "Solo se pueden reintentar notificaciones rechazadas.", messages.WARNING)
+                return
+
+            codigo_http = notificacion.estado_http
+            notificacion.estado = estados.PENDIENTE
+            notificacion.intento_en = None
+            notificacion.finalizado_en = None
+            notificacion.estado_http = None
+            notificacion.detalle = ""
+            notificacion.save(update_fields=["estado", "intento_en", "finalizado_en", "estado_http", "detalle"])
+            self.log_change(request, notificacion, f"Reintento manual tras rechazo HTTP {codigo_http}.")
+
+        self.message_user(request, "La notificación quedó pendiente para el próximo envío.", messages.SUCCESS)
 
     def has_delete_permission(self, request, obj=None):
         return False
